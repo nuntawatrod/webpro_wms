@@ -598,6 +598,98 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
     });
 });
 
+// Edit user role and/or password
+app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
+    const id = req.params.id;
+    const { role, password } = req.body;
+    if (!role && !password) return res.status(400).json({ error: 'ไม่มีข้อมูลที่จะอัปเดต' });
+
+    const updates = [];
+    const params = [];
+
+    if (role) {
+        updates.push('role = ?');
+        params.push(role === 'admin' ? 'admin' : 'user');
+    }
+    if (password) {
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(password, salt);
+        updates.push('password = ?');
+        params.push(hash);
+    }
+    params.push(id);
+
+    db.run(`UPDATE Users SET ${updates.join(', ')} WHERE id = ?`, params, function (err) {
+        if (err) return res.status(500).json({ error: 'อัปเดตไม่สำเร็จ' });
+        if (this.changes === 0) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+        res.json({ message: 'อัปเดตบัญชีสำเร็จ' });
+    });
+});
+
+// ==========================================
+// API ENDPOINTS - PRODUCT CRUD (Admin)
+// ==========================================
+
+// List all products (admin view with full details)
+app.get('/api/admin/products', requireAdmin, (req, res) => {
+    db.all(`SELECT id, product_name, price, image_url, category_name, shelf_life_days FROM Products ORDER BY category_name ASC, product_name ASC`, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// Create new product
+app.post('/api/admin/products', requireAdmin, (req, res) => {
+    const { product_name, price, image_url, category_name, shelf_life_days } = req.body;
+    if (!product_name || !product_name.trim()) return res.status(400).json({ error: 'กรุณาใส่ชื่อสินค้า' });
+
+    db.run(
+        `INSERT INTO Products (product_name, price, image_url, category_name, status, shelf_life_days) VALUES (?, ?, ?, ?, 'normal', ?)`,
+        [product_name.trim(), parseFloat(price) || 0, (image_url || '').trim(), (category_name || 'ทั่วไป').trim(), parseInt(shelf_life_days) || 7],
+        function (err) {
+            if (err) return res.status(500).json({ error: 'ชื่อสินค้านี้มีอยู่แล้ว หรือเกิดข้อผิดพลาด' });
+            res.json({ message: 'สร้างสินค้าสำเร็จ', id: this.lastID });
+        }
+    );
+});
+
+// Edit product
+app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
+    const id = req.params.id;
+    const { product_name, price, image_url, category_name, shelf_life_days } = req.body;
+    if (!product_name || !product_name.trim()) return res.status(400).json({ error: 'กรุณาใส่ชื่อสินค้า' });
+
+    db.run(
+        `UPDATE Products SET product_name = ?, price = ?, image_url = ?, category_name = ?, shelf_life_days = ? WHERE id = ?`,
+        [product_name.trim(), parseFloat(price) || 0, (image_url || '').trim(), (category_name || 'ทั่วไป').trim(), parseInt(shelf_life_days) || 7, id],
+        function (err) {
+            if (err) return res.status(500).json({ error: 'อัปเดตสินค้าล้มเหลว: ' + err.message });
+            if (this.changes === 0) return res.status(404).json({ error: 'ไม่พบสินค้า' });
+            res.json({ message: 'อัปเดตสินค้าสำเร็จ' });
+        }
+    );
+});
+
+// Delete product (cascade: delete its stock and transaction logs)
+app.delete('/api/admin/products/:id', requireAdmin, (req, res) => {
+    const id = req.params.id;
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        db.run('DELETE FROM Stock WHERE product_id = ?', [id], (err) => {
+            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสต็อกล้มเหลว' }); }
+            db.run('DELETE FROM Transactions_Log WHERE product_id = ?', [id], (err2) => {
+                if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบประวัติล้มเหลว' }); }
+                db.run('DELETE FROM Products WHERE id = ?', [id], function (err3) {
+                    if (err3) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสินค้าล้มเหลว' }); }
+                    if (this.changes === 0) { db.run('ROLLBACK'); return res.status(404).json({ error: 'ไม่พบสินค้า' }); }
+                    db.run('COMMIT');
+                    res.json({ message: 'ลบสินค้าสำเร็จ' });
+                });
+            });
+        });
+    });
+});
+
 
 // Start listening
 app.listen(PORT, () => {

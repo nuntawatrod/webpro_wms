@@ -268,8 +268,8 @@ function initDashboard() {
             // Master Row — strong red background if any batch expires within 2 days
             const tr = document.createElement('tr');
             tr.className = `transition-colors group border-b border-slate-100 ${isExpiringSoonOverall
-                    ? 'bg-rose-100 hover:bg-rose-200'
-                    : 'hover:bg-slate-50'
+                ? 'bg-rose-100 hover:bg-rose-200'
+                : 'hover:bg-slate-50'
                 }`;
 
             const imgCellHtml = product.image_url
@@ -671,57 +671,76 @@ function initWithdrawPage() {
 // ============================================
 function initHistoryPage() {
     const tableBody = document.getElementById('historyTableBody');
-
-    fetchHistory();
+    const PAGE_SIZE = 100;
+    let allHistory = [];
+    let historyPage = 1;
 
     async function fetchHistory() {
         try {
             const res = await fetch(`${API_BASE}/history`);
             if (!res.ok) throw new Error();
-            const data = await res.json();
-            renderHistory(data);
+            allHistory = await res.json();
+            historyPage = 1;
+            renderHistoryPage();
         } catch (e) {
-            tableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-rose-500">ลดข้อมูลผิดพลาด โปรดลองใหม่</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-rose-500">โหลดข้อมูลผิดพลาด โปรดลองใหม่</td></tr>`;
         }
     }
 
-    function renderHistory(data) {
-        if (data.length === 0) {
+    function renderHistoryPage() {
+        const total = allHistory.length;
+        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        if (historyPage > totalPages) historyPage = totalPages;
+        const start = (historyPage - 1) * PAGE_SIZE;
+        const pageData = allHistory.slice(start, start + PAGE_SIZE);
+
+        if (total === 0) {
             tableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500">ไม่พบประวัติการทำรายการ</td></tr>`;
-            return;
+        } else {
+            tableBody.innerHTML = '';
+            pageData.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100/60';
+                const d = new Date(log.action_date);
+                const formattedDate = d.toLocaleString('th-TH', {
+                    day: '2-digit', month: 'short', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+                const isAdd = log.action_type === 'ADD';
+                const actionBadge = isAdd
+                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">รับเข้า (ADD)</span>`
+                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">เบิกออก (WITHDRAW)</span>`;
+                tr.innerHTML = `
+                    <td class="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">${formattedDate}</td>
+                    <td class="px-6 py-4">${actionBadge}</td>
+                    <td class="px-6 py-4 font-medium text-slate-800">${log.product_name}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold ${isAdd ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${isAdd ? '+' : '-'}${log.quantity}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-600">${log.actor_name}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
         }
 
-        tableBody.innerHTML = '';
-
-        data.forEach(log => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100/60';
-
-            const d = new Date(log.action_date);
-            const formattedDate = d.toLocaleString('th-TH', {
-                day: '2-digit', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit'
-            });
-
-            const isAdd = log.action_type === 'ADD';
-            const actionBadge = isAdd
-                ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">รับเข้า (ADD)</span>`
-                : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">เบิกออก (WITHDRAW)</span>`;
-
-            tr.innerHTML = `
-                <td class="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">${formattedDate}</td>
-                <td class="px-6 py-4">${actionBadge}</td>
-                <td class="px-6 py-4 font-medium text-slate-800">${log.product_name}</td>
-                <td class="px-6 py-4 text-right font-mono font-bold ${isAdd ? 'text-emerald-600' : 'text-rose-600'}">
-                    ${isAdd ? '+' : '-'}${log.quantity}
-                </td>
-                <td class="px-6 py-4 text-sm text-slate-600">${log.actor_name}</td>
-            `;
-
-            tableBody.appendChild(tr);
-        });
+        // Pagination controls
+        const pg = document.getElementById('historyPagination');
+        if (!pg) return;
+        if (totalPages <= 1) { pg.innerHTML = ''; return; }
+        const prevDis = historyPage === 1 ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'hover:bg-slate-100';
+        const nextDis = historyPage === totalPages ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'hover:bg-slate-100';
+        pg.innerHTML = `
+            <span>แสดง ${start + 1}–${Math.min(start + PAGE_SIZE, total)} จาก ${total} รายการ</span>
+            <div class="flex items-center gap-1">
+                <button id="histPrevBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm ${prevDis}">ก่อนหน้า</button>
+                <span class="px-3 py-1.5 text-sm font-semibold text-emerald-700">${historyPage} / ${totalPages}</span>
+                <button id="histNextBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm ${nextDis}">ถัดไป</button>
+            </div>`;
+        document.getElementById('histPrevBtn')?.addEventListener('click', () => { historyPage--; renderHistoryPage(); window.scrollTo(0, 0); });
+        document.getElementById('histNextBtn')?.addEventListener('click', () => { historyPage++; renderHistoryPage(); window.scrollTo(0, 0); });
     }
 
+    fetchHistory();
 }
 
 // ============================================
