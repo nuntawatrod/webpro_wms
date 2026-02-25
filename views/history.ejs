@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="th">
+<%- include('layout/head') %>
+
+    <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+        <!-- Navbar -->
+        <%- include('layout/navbar', { activePage: 'history' , user: locals.user }) %>
+
+            <!-- Main Content -->
+            <main class="flex-grow max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">ประวัติการทำรายการ (Transaction History)</h1>
+                        <p class="text-sm text-slate-500 mt-1">บันทึกการนำเข้าและเบิกจ่ายสินค้าทั้งหมด</p>
+                    </div>
+                </div>
+
+                <!-- History Table -->
+                <div class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr
+                                    class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                                    <th class="px-6 py-4">วัน-เวลา</th>
+                                    <th class="px-6 py-4">ประเภทรายการ</th>
+                                    <th class="px-6 py-4">ชื่อสินค้า</th>
+                                    <th class="px-6 py-4 text-right">จำนวน</th>
+                                    <th class="px-6 py-4">ผู้ทำรายการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody" class="divide-y divide-slate-100">
+                                <!-- Rows injected via JS -->
+                                <tr>
+                                    <td colspan="5" class="px-6 py-8 text-center text-sm text-slate-500">
+                                        กำลังโหลดประวัติทำรายการ...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </main>
+
+            <script>
+                const AUTH_USER = { username: "<%= locals.user ? locals.user.username : '' %>", role: "<%= locals.user ? locals.user.role : '' %>" };
+            </script>
+            <script src="/js/main.js"></script>
+    </body>
+
+</html>

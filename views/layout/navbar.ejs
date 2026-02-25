@@ -1,0 +1,52 @@
+<!-- Navbar Component -->
+<nav class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+            <div class="flex items-center">
+                <span
+                    class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500 hidden sm:block">คลังสินค้าอาหารสดและอาหาร</span>
+                <span
+                    class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500 sm:hidden">WMS</span>
+            </div>
+            <div class="flex items-center space-x-4 sm:space-x-8">
+                <a href="/"
+                    class="<%= locals.activePage === 'dashboard' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">หน้าหลัก</a>
+                <a href="/withdraw"
+                    class="<%= locals.activePage === 'withdraw' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">เบิกสินค้า</a>
+                <a href="/history"
+                    class="<%= locals.activePage === 'history' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">ประวัติ</a>
+
+                <% if (user && user.role==='admin' ) { %>
+                    <div class="relative group">
+                        <button
+                            class="<%= locals.activePage === 'admin' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors flex items-center">
+                            ผู้ดูแลระบบ <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div
+                            class="absolute right-0 mt-0 w-48 bg-white border border-slate-200 rounded-md shadow-lg hidden group-hover:block z-50">
+                            <a href="/admin"
+                                class="block px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 border-b border-slate-100">แดชบอร์ดสถิติ</a>
+                            <a href="/admin/users"
+                                class="block px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-600">จัดการผู้ใช้</a>
+                        </div>
+                    </div>
+                    <% } %>
+
+                        <form action="/logout" method="POST" class="ml-4 pl-4 border-l border-slate-200 py-3 block">
+                            <button type="submit"
+                                class="text-sm font-medium text-rose-500 hover:text-rose-700 focus:outline-none flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                                    </path>
+                                </svg>
+                                ออกจากระบบ
+                            </button>
+                        </form>
+            </div>
+        </div>
+    </div>
+</nav>

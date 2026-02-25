@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<%- include('layout/head') %>
+
+    <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+        <%- include('layout/navbar', { activePage: 'admin' , user: locals.user }) %>
+
+            <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+                <div class="mb-8">
+                    <h1 class="text-2xl font-bold text-slate-900">แดชบอร์ดสถิติผู้ดูแลระบบ (Admin Dashboard)</h1>
+                    <p class="text-sm text-slate-500 mt-1">ภาพรวมการเคลื่อนไหวของสินค้าในคลัง</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                    <!-- Top 5 Best Sellers -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-emerald-50">
+                            <h2 class="text-lg font-semibold text-emerald-800 flex items-center">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                </svg>
+                                5 อันดับ สินค้าเบิกออกเยอะสุด (ขายดี)
+                            </h2>
+                        </div>
+                        <div class="p-6 text-center text-slate-500" id="top5Loading">
+                            กำลังโหลดข้อมูล...
+                        </div>
+                        <ul class="divide-y divide-slate-100 hidden" id="top5List">
+                            <!-- Injected by JS -->
+                        </ul>
+                    </div>
+
+                    <!-- Top 5 Worst Sellers -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-rose-50">
+                            <h2 class="text-lg font-semibold text-rose-800 flex items-center">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                                </svg>
+                                5 อันดับ สินค้าเบิกออกน้อยสุด (ขายช้า)
+                            </h2>
+                        </div>
+                        <div class="p-6 text-center text-slate-500" id="worst5Loading">
+                            กำลังโหลดข้อมูล...
+                        </div>
+                        <ul class="divide-y divide-slate-100 hidden" id="worst5List">
+                            <!-- Injected by JS -->
+                        </ul>
+                    </div>
+
+                </div>
+
+            </main>
+
+            <script src="/js/main.js"></script>
+            <script>
+                // Inline script to bootstrap admin logic to avoid clogging main.js
+                document.addEventListener('DOMContentLoaded', async () => {
+                    const top5List = document.getElementById('top5List');
+                    const worst5List = document.getElementById('worst5List');
+
+                    try {
+                        const res = await fetch('/api/admin/dashboard-stats');
+                        const data = await res.json();
+
+                        document.getElementById('top5Loading').classList.add('hidden');
+                        document.getElementById('worst5Loading').classList.add('hidden');
+                        top5List.classList.remove('hidden');
+                        worst5List.classList.remove('hidden');
+
+                        if (data.top5.length === 0) {
+                            top5List.innerHTML = '<li class="px-6 py-8 text-center text-slate-500">ยังไม่มีข้อมูลการเบิกจ่ายสินค้า</li>';
+                        } else {
+                            data.top5.forEach((item, index) => {
+                                top5List.innerHTML += `
+                            <li class="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div class="flex items-center">
+                                    <span class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm mr-4">${index + 1}</span>
+                                    <span class="font-medium text-slate-800">${item.product_name}</span>
+                                </div>
+                                <span class="font-mono font-bold text-emerald-600">${item.total_sold}</span>
+                            </li>
+                        `;
+                            });
+                        }
+
+                        if (data.worst5.length === 0) {
+                            worst5List.innerHTML = '<li class="px-6 py-8 text-center text-slate-500">ยังไม่มีข้อมูลการเบิกจ่ายสินค้า</li>';
+                        } else {
+                            data.worst5.forEach((item, index) => {
+                                worst5List.innerHTML += `
+                            <li class="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div class="flex items-center">
+                                    <span class="w-8 h-8 rounded-full bg-rose-100 text-rose-800 flex items-center justify-center font-bold text-sm mr-4">${index + 1}</span>
+                                    <span class="font-medium text-slate-800">${item.product_name}</span>
+                                </div>
+                                <span class="font-mono font-bold text-rose-600">${item.total_sold}</span>
+                            </li>
+                        `;
+                            });
+                        }
+
+                    } catch (e) {
+                        console.error(e);
+                    }
+                });
+            </script>
+    </body>
+
+</html>
