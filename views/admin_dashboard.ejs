@@ -8,106 +8,404 @@
 
             <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
 
-                <div class="mb-8">
-                    <h1 class="text-2xl font-bold text-slate-900">แดชบอร์ดสถิติผู้ดูแลระบบ (Admin Dashboard)</h1>
-                    <p class="text-sm text-slate-500 mt-1">ภาพรวมการเคลื่อนไหวของสินค้าในคลัง</p>
+                <!-- Page Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">แผงควบคุมผู้ดูแลระบบ</h1>
+                        <p class="text-sm text-slate-500 mt-1">ภาพรวมและสถิติการทำงานของคลังสินค้า</p>
+                    </div>
+                    <button id="btnReseedStock"
+                        class="shrink-0 flex items-center px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-400">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                        สุ่มสต็อกสินค้าใหม่ทั้งหมด
+                    </button>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Tab Navigation -->
+                <div class="border-b border-slate-200 mb-6">
+                    <nav class="flex space-x-1 -mb-px overflow-x-auto">
+                        <button
+                            class="admin-tab active-tab px-5 py-3 text-sm font-semibold text-emerald-700 border-b-2 border-emerald-600 whitespace-nowrap"
+                            data-tab="stats">
+                            📊 สถิติการขาย
+                        </button>
+                        <button
+                            class="admin-tab px-5 py-3 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent hover:border-slate-300 whitespace-nowrap"
+                            data-tab="users">
+                            👤 จัดการผู้ใช้งาน
+                        </button>
+                    </nav>
+                </div>
 
-                    <!-- Top 5 Best Sellers -->
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-slate-100 bg-emerald-50">
-                            <h2 class="text-lg font-semibold text-emerald-800 flex items-center">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                                </svg>
-                                5 อันดับ สินค้าเบิกออกเยอะสุด (ขายดี)
-                            </h2>
+                <!-- Tab: Statistics -->
+                <div id="tab-stats" class="tab-panel">
+
+                    <!-- Summary Stat Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">สินค้าในคลัง
+                            </p>
+                            <p id="statTotalProducts" class="text-3xl font-bold text-slate-800">—</p>
                         </div>
-                        <div class="p-6 text-center text-slate-500" id="top5Loading">
-                            กำลังโหลดข้อมูล...
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                จำนวนสต็อกทั้งหมด</p>
+                            <p id="statTotalStock" class="text-3xl font-bold text-emerald-600">—</p>
                         </div>
-                        <ul class="divide-y divide-slate-100 hidden" id="top5List">
-                            <!-- Injected by JS -->
-                        </ul>
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                รายการเบิก-รับทั้งหมด</p>
+                            <p id="statTotalTx" class="text-3xl font-bold text-blue-600">—</p>
+                        </div>
                     </div>
 
-                    <!-- Top 5 Worst Sellers -->
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-slate-100 bg-rose-50">
-                            <h2 class="text-lg font-semibold text-rose-800 flex items-center">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                                </svg>
-                                5 อันดับ สินค้าเบิกออกน้อยสุด (ขายช้า)
+                    <!-- Charts Row -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <!-- Top 5 Sellers Chart -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h2 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                <span class="text-xl">🏆</span> 5 อันดับสินค้าขายดีสุด
                             </h2>
+                            <div class="relative h-64">
+                                <canvas id="chartTop5"></canvas>
+                                <p id="chartTop5Empty"
+                                    class="hidden absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+                                    ยังไม่มีข้อมูลการเบิกสินค้า</p>
+                            </div>
                         </div>
-                        <div class="p-6 text-center text-slate-500" id="worst5Loading">
-                            กำลังโหลดข้อมูล...
+
+                        <!-- Worst 5 Sellers Chart -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h2 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                <span class="text-xl">📉</span> 5 อันดับสินค้าขายช้าสุด
+                            </h2>
+                            <div class="relative h-64">
+                                <canvas id="chartWorst5"></canvas>
+                                <p id="chartWorst5Empty"
+                                    class="hidden absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+                                    ยังไม่มีข้อมูลการเบิกสินค้า</p>
+                            </div>
                         </div>
-                        <ul class="divide-y divide-slate-100 hidden" id="worst5List">
-                            <!-- Injected by JS -->
-                        </ul>
                     </div>
 
+                    <!-- Recent Activity -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100">
+                            <h2 class="text-base font-semibold text-slate-800">ประวัติล่าสุด (10 รายการ)</h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead>
+                                    <tr
+                                        class="bg-slate-50 text-xs text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
+                                        <th class="px-6 py-3">วัน-เวลา</th>
+                                        <th class="px-6 py-3">ประเภท</th>
+                                        <th class="px-6 py-3">สินค้า</th>
+                                        <th class="px-6 py-3 text-right">จำนวน</th>
+                                        <th class="px-6 py-3">ผู้ทำรายการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentActivity" class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-6 text-center text-slate-400">กำลังโหลด...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Tab: User Management -->
+                <div id="tab-users" class="tab-panel hidden">
+
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-semibold text-slate-800">รายชื่อบัญชีผู้ใช้งาน</h2>
+                        <button id="btnCreateUser"
+                            class="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm transition-all focus:outline-none">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z">
+                                </path>
+                            </svg>
+                            สร้างบัญชีใหม่
+                        </button>
+                    </div>
+
+                    <div class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr
+                                        class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                                        <th class="px-6 py-4">ID</th>
+                                        <th class="px-6 py-4">ชื่อผู้ใช้</th>
+                                        <th class="px-6 py-4">บทบาท</th>
+                                        <th class="px-6 py-4 text-center">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userTableBody" class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td colspan="4" class="px-6 py-4 text-center text-slate-500 text-sm">
+                                            กำลังโหลด...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
             </main>
 
-            <script src="/js/main.js"></script>
+            <!-- Create User Modal -->
+            <div id="createUserModal"
+                class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-slate-800">สร้างบัญชีผู้ใช้ใหม่</h2>
+                        <button onclick="document.getElementById('createUserModal').classList.add('hidden')"
+                            class="text-slate-400 hover:text-rose-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <form id="createUserForm" class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้ <span
+                                    class="text-rose-500">*</span></label>
+                            <input type="text" id="newUsername" required
+                                class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                                autocomplete="off">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">รหัสผ่าน <span
+                                    class="text-rose-500">*</span></label>
+                            <input type="password" id="newPassword" required
+                                class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">บทบาท</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label
+                                    class="flex items-center text-sm cursor-pointer border px-4 py-2.5 rounded-lg hover:bg-slate-50">
+                                    <input type="radio" name="newRole" value="user" checked
+                                        class="mr-2 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                                    ผู้ใช้ทั่วไป
+                                </label>
+                                <label
+                                    class="flex items-center text-sm cursor-pointer border px-4 py-2.5 rounded-lg hover:bg-slate-50">
+                                    <input type="radio" name="newRole" value="admin"
+                                        class="mr-2 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                                    ผู้ดูแลระบบ
+                                </label>
+                            </div>
+                        </div>
+                        <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100">
+                            <button type="button"
+                                onclick="document.getElementById('createUserModal').classList.add('hidden')"
+                                class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">ยกเลิก</button>
+                            <button type="submit"
+                                class="px-4 py-2 bg-emerald-600 rounded-lg text-sm font-medium text-white hover:bg-emerald-700 shadow-sm">บันทึก</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Chart.js CDN -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
             <script>
-                // Inline script to bootstrap admin logic to avoid clogging main.js
-                document.addEventListener('DOMContentLoaded', async () => {
-                    const top5List = document.getElementById('top5List');
-                    const worst5List = document.getElementById('worst5List');
+                const AUTH_USER = { username: "<%= locals.user ? locals.user.username : '' %>", role: "<%= locals.user ? locals.user.role : '' %>" };
 
+                // --- Tab Switching ---
+                const tabs = document.querySelectorAll('.admin-tab');
+                const panels = document.querySelectorAll('.tab-panel');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        tabs.forEach(t => {
+                            t.classList.remove('active-tab', 'text-emerald-700', 'border-emerald-600', 'font-semibold');
+                            t.classList.add('text-slate-500', 'border-transparent', 'font-medium');
+                        });
+                        panels.forEach(p => p.classList.add('hidden'));
+                        tab.classList.add('active-tab', 'text-emerald-700', 'border-emerald-600', 'font-semibold');
+                        tab.classList.remove('text-slate-500', 'border-transparent', 'font-medium');
+                        document.getElementById(`tab-${tab.dataset.tab}`).classList.remove('hidden');
+                    });
+                });
+
+                // --- Load Stats & Charts ---
+                async function loadStats() {
                     try {
-                        const res = await fetch('/api/admin/dashboard-stats');
+                        const [statsRes, historyRes] = await Promise.all([
+                            fetch('/api/admin/dashboard-stats'),
+                            fetch('/api/history')
+                        ]);
+                        const stats = await statsRes.json();
+                        const history = await historyRes.json();
+
+                        // Summary cards
+                        document.getElementById('statTotalProducts').textContent = (stats.totalProducts ?? '—').toLocaleString();
+                        document.getElementById('statTotalStock').textContent = (stats.totalStock ?? '—').toLocaleString();
+                        document.getElementById('statTotalTx').textContent = (stats.totalTx ?? '—').toLocaleString();
+
+                        // Charts
+                        function makeChart(canvasId, emptyId, labels, values, color) {
+                            if (!values.length) {
+                                document.getElementById(emptyId).classList.remove('hidden');
+                                document.getElementById(canvasId).classList.add('hidden');
+                                return;
+                            }
+                            new Chart(document.getElementById(canvasId), {
+                                type: 'bar',
+                                data: {
+                                    labels,
+                                    datasets: [{ data: values, backgroundColor: color, borderRadius: 6, barThickness: 28 }]
+                                },
+                                options: {
+                                    responsive: true, maintainAspectRatio: false,
+                                    plugins: { legend: { display: false } },
+                                    scales: {
+                                        x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 30 } },
+                                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 } } }
+                                    }
+                                }
+                            });
+                        }
+
+                        makeChart('chartTop5', 'chartTop5Empty',
+                            stats.top5.map(i => i.product_name.substring(0, 12) + (i.product_name.length > 12 ? '…' : '')),
+                            stats.top5.map(i => i.total_sold),
+                            'rgba(16, 185, 129, 0.7)'
+                        );
+
+                        makeChart('chartWorst5', 'chartWorst5Empty',
+                            stats.worst5.map(i => i.product_name.substring(0, 12) + (i.product_name.length > 12 ? '…' : '')),
+                            stats.worst5.map(i => i.total_sold),
+                            'rgba(239, 68, 68, 0.7)'
+                        );
+
+                        // Recent Activity
+                        const tbody = document.getElementById('recentActivity');
+                        const recent = history.slice(0, 10);
+                        if (recent.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-6 text-center text-slate-400">ยังไม่มีรายการ</td></tr>';
+                        } else {
+                            tbody.innerHTML = recent.map(log => {
+                                const isAdd = log.action_type === 'ADD';
+                                const d = new Date(log.action_date);
+                                const dt = d.toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                                const badge = isAdd
+                                    ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">รับเข้า</span>'
+                                    : '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">เบิกออก</span>';
+                                return `<tr class="hover:bg-slate-50">
+                            <td class="px-6 py-3 text-slate-400 text-xs whitespace-nowrap">${dt}</td>
+                            <td class="px-6 py-3">${badge}</td>
+                            <td class="px-6 py-3 text-slate-800 font-medium">${log.product_name}</td>
+                            <td class="px-6 py-3 text-right font-mono font-bold ${isAdd ? 'text-emerald-600' : 'text-rose-600'}">${isAdd ? '+' : '-'}${log.quantity}</td>
+                            <td class="px-6 py-3 text-slate-500">${log.actor_name}</td>
+                        </tr>`;
+                            }).join('');
+                        }
+
+                    } catch (e) { console.error(e); }
+                }
+
+                // --- Reseed Stock ---
+                document.getElementById('btnReseedStock').addEventListener('click', async () => {
+                    const conf = await Swal.fire({
+                        title: 'ยืนยันการสุ่มสต็อกใหม่?',
+                        text: 'ระบบจะลบสต็อกปัจจุบันทั้งหมดและสุ่มจำนวนใหม่ให้ทุกรายการสินค้า',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#d97706',
+                        cancelButtonColor: '#64748b',
+                        confirmButtonText: 'ยืนยัน',
+                        cancelButtonText: 'ยกเลิก'
+                    });
+                    if (!conf.isConfirmed) return;
+                    try {
+                        const res = await fetch('/api/admin/reseed-stock', { method: 'POST' });
                         const data = await res.json();
-
-                        document.getElementById('top5Loading').classList.add('hidden');
-                        document.getElementById('worst5Loading').classList.add('hidden');
-                        top5List.classList.remove('hidden');
-                        worst5List.classList.remove('hidden');
-
-                        if (data.top5.length === 0) {
-                            top5List.innerHTML = '<li class="px-6 py-8 text-center text-slate-500">ยังไม่มีข้อมูลการเบิกจ่ายสินค้า</li>';
+                        if (res.ok) {
+                            Swal.fire('สำเร็จ!', data.message, 'success');
+                            loadStats();
                         } else {
-                            data.top5.forEach((item, index) => {
-                                top5List.innerHTML += `
-                            <li class="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                <div class="flex items-center">
-                                    <span class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm mr-4">${index + 1}</span>
-                                    <span class="font-medium text-slate-800">${item.product_name}</span>
-                                </div>
-                                <span class="font-mono font-bold text-emerald-600">${item.total_sold}</span>
-                            </li>
-                        `;
-                            });
+                            Swal.fire('ผิดพลาด', data.error, 'error');
                         }
+                    } catch (e) { Swal.fire('ผิดพลาด', 'ระบบขัดข้อง', 'error'); }
+                });
 
-                        if (data.worst5.length === 0) {
-                            worst5List.innerHTML = '<li class="px-6 py-8 text-center text-slate-500">ยังไม่มีข้อมูลการเบิกจ่ายสินค้า</li>';
+                // --- User Management ---
+                function loadUsers() {
+                    const tableBody = document.getElementById('userTableBody');
+                    fetch('/api/admin/users').then(r => r.json()).then(users => {
+                        tableBody.innerHTML = users.map(u => {
+                            const roleBadge = u.role === 'admin'
+                                ? '<span class="px-2.5 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-semibold">Admin</span>'
+                                : '<span class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-semibold">User</span>';
+                            const isSelf = u.username === AUTH_USER.username;
+                            const deleteBtn = isSelf
+                                ? '<span class="text-xs text-slate-400">(บัญชีของคุณ)</span>'
+                                : `<button onclick="deleteUser(${u.id}, '${u.username}')" class="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
+                            return `<tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-6 py-4 text-sm text-slate-500 font-mono">${u.id}</td>
+                        <td class="px-6 py-4 font-medium text-slate-800">${u.username}</td>
+                        <td class="px-6 py-4">${roleBadge}</td>
+                        <td class="px-6 py-4 text-center">${deleteBtn}</td>
+                    </tr>`;
+                        }).join('');
+                    });
+                }
+
+                document.getElementById('btnCreateUser').addEventListener('click', () => {
+                    document.getElementById('createUserForm').reset();
+                    document.getElementById('createUserModal').classList.remove('hidden');
+                });
+
+                document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const username = document.getElementById('newUsername').value.trim();
+                    const password = document.getElementById('newPassword').value;
+                    const role = document.querySelector('input[name="newRole"]:checked').value;
+                    try {
+                        const res = await fetch('/api/admin/users', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username, password, role })
+                        });
+                        const result = await res.json();
+                        if (res.ok) {
+                            Swal.fire('สำเร็จ!', 'สร้างบัญชีผู้ใช้เรียบร้อย', 'success');
+                            document.getElementById('createUserModal').classList.add('hidden');
+                            loadUsers();
                         } else {
-                            data.worst5.forEach((item, index) => {
-                                worst5List.innerHTML += `
-                            <li class="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                <div class="flex items-center">
-                                    <span class="w-8 h-8 rounded-full bg-rose-100 text-rose-800 flex items-center justify-center font-bold text-sm mr-4">${index + 1}</span>
-                                    <span class="font-medium text-slate-800">${item.product_name}</span>
-                                </div>
-                                <span class="font-mono font-bold text-rose-600">${item.total_sold}</span>
-                            </li>
-                        `;
-                            });
+                            Swal.fire('ล้มเหลว', result.error, 'error');
                         }
+                    } catch { Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง', 'error'); }
+                });
 
-                    } catch (e) {
-                        console.error(e);
-                    }
+                window.deleteUser = async (id, username) => {
+                    const conf = await Swal.fire({
+                        title: `ลบผู้ใช้ "${username}"?`,
+                        icon: 'warning', showCancelButton: true,
+                        confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b',
+                        confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก'
+                    });
+                    if (!conf.isConfirmed) return;
+                    const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+                    if (res.ok) { loadUsers(); Swal.fire('ลบสำเร็จ!', '', 'success'); }
+                    else { const d = await res.json(); Swal.fire('ลบล้มเหลว', d.error, 'error'); }
+                };
+
+                // --- Init ---
+                document.addEventListener('DOMContentLoaded', () => {
+                    loadStats();
+                    loadUsers();
                 });
             </script>
     </body>

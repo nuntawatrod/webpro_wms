@@ -471,24 +471,81 @@ app.get('/api/history', requireAuth, (req, res) => {
 app.get('/api/admin/dashboard-stats', requireAdmin, (req, res) => {
     const stats = {};
 
-    // Top 5 Sellers (Most withdraws sum)
-    db.all(`
-        SELECT p.product_name, SUM(t.quantity) as total_sold
-        FROM Transactions_Log t JOIN Products p ON t.product_id = p.id
-        WHERE t.action_type = 'WITHDRAW'
-        GROUP BY t.product_id ORDER BY total_sold DESC LIMIT 5
-    `, [], (err, top) => {
-        stats.top5 = top || [];
+    // Summary totals
+    db.get(`SELECT COUNT(*) as totalProducts FROM Products`, (err, row1) => {
+        stats.totalProducts = row1?.totalProducts || 0;
 
-        // Worst 5 Sellers
-        db.all(`
-            SELECT p.product_name, SUM(t.quantity) as total_sold
-            FROM Transactions_Log t JOIN Products p ON t.product_id = p.id
-            WHERE t.action_type = 'WITHDRAW'
-            GROUP BY t.product_id ORDER BY total_sold ASC LIMIT 5
-        `, [], (err, worst) => {
-            stats.worst5 = worst || [];
-            res.json(stats);
+        db.get(`SELECT SUM(quantity) as totalStock FROM Stock WHERE quantity > 0`, (err, row2) => {
+            stats.totalStock = row2?.totalStock || 0;
+
+            db.get(`SELECT COUNT(*) as totalTx FROM Transactions_Log`, (err, row3) => {
+                stats.totalTx = row3?.totalTx || 0;
+
+                // Top 5 Sellers
+                db.all(`
+                    SELECT p.product_name, SUM(t.quantity) as total_sold
+                    FROM Transactions_Log t JOIN Products p ON t.product_id = p.id
+                    WHERE t.action_type = 'WITHDRAW'
+                    GROUP BY t.product_id ORDER BY total_sold DESC LIMIT 5
+                `, [], (err, top) => {
+                    stats.top5 = top || [];
+
+                    // Worst 5 Sellers
+                    db.all(`
+                        SELECT p.product_name, SUM(t.quantity) as total_sold
+                        FROM Transactions_Log t JOIN Products p ON t.product_id = p.id
+                        WHERE t.action_type = 'WITHDRAW'
+                        GROUP BY t.product_id ORDER BY total_sold ASC LIMIT 5
+                    `, [], (err, worst) => {
+                        stats.worst5 = worst || [];
+                        res.json(stats);
+                    });
+                });
+            });
+        });
+    });
+});
+
+// Admin: Reseed all stock with random quantities
+app.post('/api/admin/reseed-stock', requireAdmin, (req, res) => {
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        db.run('DELETE FROM Stock', (err) => {
+            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ล้มเหลวในการลบสต็อก' }); }
+
+            db.run('DELETE FROM Transactions_Log', (err2) => {
+                if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ล้มเหลวในการลบประวัติ' }); }
+
+                db.all('SELECT id, shelf_life_days FROM Products', [], (err3, products) => {
+                    if (err3 || !products.length) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ไม่พบข้อมูลสินค้า' }); }
+
+                    const stmtStock = db.prepare(`INSERT INTO Stock (product_id, receive_date, expiry_date, quantity) VALUES (?, ?, ?, ?)`);
+                    const stmtLog = db.prepare(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name) VALUES ('ADD', ?, ?, 'System/Reseed')`);
+                    const today = new Date();
+
+                    products.forEach(p => {
+                        const qty = Math.floor(Math.random() * 141) + 10; // 10-150
+                        const offset = Math.floor(Math.random() * 5); // 0-4 days ago
+                        const receiveDate = new Date(today);
+                        receiveDate.setDate(receiveDate.getDate() - offset);
+                        const expiryDate = new Date(receiveDate);
+                        expiryDate.setDate(expiryDate.getDate() + (p.shelf_life_days || 7));
+
+                        const rd = receiveDate.toISOString().split('T')[0];
+                        const ed = expiryDate.toISOString().split('T')[0];
+                        stmtStock.run([p.id, rd, ed, qty]);
+                        stmtLog.run([p.id, qty]);
+                    });
+
+                    stmtStock.finalize();
+                    stmtLog.finalize();
+
+                    db.run('COMMIT', (commitErr) => {
+                        if (commitErr) return res.status(500).json({ error: 'COMMIT ล้มเหลว' });
+                        res.json({ message: `สุ่มสต็อกสินค้า ${products.length} รายการสำเร็จ` });
+                    });
+                });
+            });
         });
     });
 });

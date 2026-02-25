@@ -69,6 +69,9 @@ function initDashboard() {
     let inventoryData = [];
     let currentSort = 'category'; // default
     let currentView = 'grid'; // default
+    let currentCategory = 'all';
+    let currentPage = 1;
+    const PAGE_SIZE = 100;
 
     const gridView = document.getElementById('gridView');
     const tableView = document.getElementById('tableView');
@@ -90,6 +93,7 @@ function initDashboard() {
             const res = await fetch(`${API_BASE}/inventory`);
             if (!res.ok) throw new Error('Failed to load inventory');
             inventoryData = await res.json();
+            buildCategoryTabs();
             renderData();
         } catch (err) {
             console.error(err);
@@ -100,6 +104,31 @@ function initDashboard() {
         }
     }
 
+    // Build category filter tabs dynamically from data
+    function buildCategoryTabs() {
+        const tabContainer = document.getElementById('categoryTabs');
+        if (!tabContainer) return;
+        const uniqueCats = [...new Set(inventoryData.map(p => p.category_name || 'ทั่วไป'))].sort();
+        const allCats = ['ทั้งหมด', ...uniqueCats];
+        tabContainer.innerHTML = '';
+        allCats.forEach(cat => {
+            const id = cat === 'ทั้งหมด' ? 'all' : cat;
+            const isActive = (currentCategory === 'all' && cat === 'ทั้งหมด') || currentCategory === cat;
+            const btn = document.createElement('button');
+            btn.className = `px-4 py-1.5 text-sm font-medium rounded-full transition-all focus:outline-none whitespace-nowrap ${isActive ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20' : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-300 hover:text-emerald-600'
+                }`;
+            btn.textContent = cat;
+            btn.dataset.cat = id;
+            btn.addEventListener('click', () => {
+                currentCategory = id;
+                currentPage = 1;
+                buildCategoryTabs();
+                renderData();
+            });
+            tabContainer.appendChild(btn);
+        });
+    }
+
     function renderData() {
         if (inventoryData.length === 0) {
             gridView.classList.add('hidden');
@@ -107,11 +136,15 @@ function initDashboard() {
             emptyState.classList.remove('hidden');
             return;
         }
-
         emptyState.classList.add('hidden');
 
-        // Sorting Logic including category
-        const sortedData = [...inventoryData].sort((a, b) => {
+        // Filter by category
+        const filtered = currentCategory === 'all'
+            ? inventoryData
+            : inventoryData.filter(p => (p.category_name || 'ทั่วไป') === currentCategory);
+
+        // Sort
+        const sortedData = [...filtered].sort((a, b) => {
             if (currentSort === 'category') {
                 const catA = a.category_name || '';
                 const catB = b.category_name || '';
@@ -130,13 +163,11 @@ function initDashboard() {
                     const d = new Date(b.expiry_date).getTime();
                     return nearest === null ? d : Math.min(nearest, d);
                 }, null);
-
                 const expB = b.batches.reduce((nearest, b) => {
                     if (!b.expiry_date) return nearest;
                     const d = new Date(b.expiry_date).getTime();
                     return nearest === null ? d : Math.min(nearest, d);
                 }, null);
-
                 if (expA === null && expB === null) return 0;
                 if (expA === null) return 1;
                 if (expB === null) return -1;
@@ -145,15 +176,49 @@ function initDashboard() {
             return 0;
         });
 
+        // Paginate
+        const totalPages = Math.max(1, Math.ceil(sortedData.length / PAGE_SIZE));
+        if (currentPage > totalPages) currentPage = totalPages;
+        const start = (currentPage - 1) * PAGE_SIZE;
+        const pageData = sortedData.slice(start, start + PAGE_SIZE);
+        renderPagination(sortedData.length, totalPages);
+
+        if (pageData.length === 0) {
+            gridView.classList.add('hidden');
+            tableView.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            return;
+        }
+
         if (currentView === 'grid') {
-            renderGrid(sortedData);
+            renderGrid(pageData);
             gridView.classList.remove('hidden');
             tableView.classList.add('hidden');
         } else {
-            renderTable(sortedData);
+            renderTable(pageData);
             tableView.classList.remove('hidden');
             gridView.classList.add('hidden');
         }
+    }
+
+    function renderPagination(totalItems, totalPages) {
+        const container = document.getElementById('paginationContainer');
+        if (!container) return;
+        if (totalPages <= 1) { container.innerHTML = ''; return; }
+        const fromItem = Math.min((currentPage - 1) * PAGE_SIZE + 1, totalItems);
+        const toItem = Math.min(currentPage * PAGE_SIZE, totalItems);
+        container.innerHTML = `
+            <div class="flex items-center justify-between flex-wrap gap-3">
+                <p class="text-sm text-slate-500">แสดง ${fromItem}–${toItem} จาก ${totalItems} รายการ</p>
+                <div class="flex items-center gap-2">
+                    <button id="btnPrevPage" class="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors" ${currentPage === 1 ? 'disabled' : ''}>← ก่อนหน้า</button>
+                    <span class="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg">หน้า ${currentPage} / ${totalPages}</span>
+                    <button id="btnNextPage" class="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors" ${currentPage === totalPages ? 'disabled' : ''}>ถัดไป →</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('btnPrevPage')?.addEventListener('click', () => { currentPage--; renderData(); window.scrollTo(0, 0); });
+        document.getElementById('btnNextPage')?.addEventListener('click', () => { currentPage++; renderData(); window.scrollTo(0, 0); });
     }
 
     function renderGrid(data) {
@@ -382,20 +447,24 @@ function initDashboard() {
         selectedProductId.value = '';
         inQuantity.value = '';
         inReceiveDate.value = new Date().toISOString().split('T')[0];
-
         btnConfirmAdd.disabled = true;
+
+        // Show modal immediately, then load products
+        addModalOverlay.classList.remove('hidden');
+        addModalContent.style.display = 'block';
 
         try {
             const res = await fetch(`${API_BASE}/products`);
             masterProducts = await res.json();
             renderProductSearchOptions(masterProducts);
+            // BUGFIX: show results immediately so user sees options right away
+            if (masterProducts.length > 0) {
+                productSearchResults.classList.remove('hidden');
+            }
         } catch (e) {
             console.error(e);
             showToast('พบข้อผิดพลาดขณะโหลดรายการสินค้า', 'error');
         }
-
-        addModalOverlay.classList.remove('hidden');
-        addModalContent.style.display = 'block';
     });
 
     const closeModal = () => {
