@@ -42,6 +42,10 @@ const requireAuth = (req, res, next) => {
     if (req.session.user) {
         next();
     } else {
+        // For API routes, return 401 JSON instead of redirect
+        if (req.path.startsWith('/api')) {
+            return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ (Unauthorized)' });
+        }
         res.redirect('/login');
     }
 };
@@ -50,6 +54,9 @@ const requireAdmin = (req, res, next) => {
     if (req.session.user && req.session.user.role === 'admin') {
         next();
     } else {
+        if (req.path.startsWith('/api')) {
+            return res.status(403).json({ error: 'ไม่มีสิทธิ์ผู้ดูแลระบบ (Admin required)' });
+        }
         res.status(403).send('Forbidden: Admin access required');
     }
 };
@@ -113,6 +120,16 @@ function initializeDatabase() {
                 const hash = bcrypt.hashSync('1234', salt);
                 db.run(`INSERT INTO Users (username, password, role) VALUES ('admin', ?, 'admin')`, [hash]);
                 console.log("Seeded default Admin user (admin / 1234)");
+            }
+        });
+
+        // Migration: add shelf_life_days if it doesn't exist in the Products table
+        db.all("PRAGMA table_info(Products)", (err, cols) => {
+            if (!err && cols && !cols.find(c => c.name === 'shelf_life_days')) {
+                db.run("ALTER TABLE Products ADD COLUMN shelf_life_days INTEGER DEFAULT 7", (alterErr) => {
+                    if (alterErr) console.error("Migration failed:", alterErr);
+                    else console.log("Migration: Added shelf_life_days column to Products.");
+                });
             }
         });
 
