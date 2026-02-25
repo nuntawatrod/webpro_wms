@@ -17,22 +17,8 @@
                     class="<%= locals.activePage === 'history' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">ประวัติ</a>
 
                 <% if (user && user.role==='admin' ) { %>
-                    <div class="relative group">
-                        <button
-                            class="<%= locals.activePage === 'admin' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors flex items-center">
-                            ผู้ดูแลระบบ <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div
-                            class="absolute right-0 mt-0 w-48 bg-white border border-slate-200 rounded-md shadow-lg hidden group-hover:block z-50">
-                            <a href="/admin"
-                                class="block px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 border-b border-slate-100">แดชบอร์ดสถิติ</a>
-                            <a href="/admin/users"
-                                class="block px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-600">จัดการผู้ใช้</a>
-                        </div>
-                    </div>
+                    <a href="/admin"
+                        class="<%= locals.activePage === 'admin' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">ผู้ดูแลระบบ</a>
                     <% } %>
 
                         <form action="/logout" method="POST" class="ml-4 pl-4 border-l border-slate-200 py-3 block">

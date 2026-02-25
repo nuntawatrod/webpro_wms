@@ -67,8 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================
 function initDashboard() {
     let inventoryData = [];
-    let currentSort = 'category'; // default
     let currentView = 'grid'; // default
+    let currentSearch = '';
     let currentCategory = 'all';
     let currentPage = 1;
     const PAGE_SIZE = 100;
@@ -138,42 +138,19 @@ function initDashboard() {
         }
         emptyState.classList.add('hidden');
 
-        // Filter by category
-        const filtered = currentCategory === 'all'
-            ? inventoryData
-            : inventoryData.filter(p => (p.category_name || 'ทั่วไป') === currentCategory);
+        // Filter by category then search
+        const filtered = inventoryData.filter(p => {
+            const matchCat = currentCategory === 'all' || (p.category_name || 'ทั่วไป') === currentCategory;
+            const matchSearch = currentSearch === '' || p.product_name.toLowerCase().includes(currentSearch);
+            return matchCat && matchSearch;
+        });
 
-        // Sort
+        // Default sort: category then name
         const sortedData = [...filtered].sort((a, b) => {
-            if (currentSort === 'category') {
-                const catA = a.category_name || '';
-                const catB = b.category_name || '';
-                if (catA === catB) return a.product_name.localeCompare(b.product_name);
-                return catA.localeCompare(catB);
-            }
-            if (currentSort === 'az') return a.product_name.localeCompare(b.product_name);
-            if (currentSort === 'newest') {
-                const dateA = a.batches.length ? Math.max(...a.batches.map(b => new Date(b.receive_date).getTime())) : 0;
-                const dateB = b.batches.length ? Math.max(...b.batches.map(b => new Date(b.receive_date).getTime())) : 0;
-                return dateB - dateA;
-            }
-            if (currentSort === 'expiring') {
-                const expA = a.batches.reduce((nearest, b) => {
-                    if (!b.expiry_date) return nearest;
-                    const d = new Date(b.expiry_date).getTime();
-                    return nearest === null ? d : Math.min(nearest, d);
-                }, null);
-                const expB = b.batches.reduce((nearest, b) => {
-                    if (!b.expiry_date) return nearest;
-                    const d = new Date(b.expiry_date).getTime();
-                    return nearest === null ? d : Math.min(nearest, d);
-                }, null);
-                if (expA === null && expB === null) return 0;
-                if (expA === null) return 1;
-                if (expB === null) return -1;
-                return expA - expB;
-            }
-            return 0;
+            const catA = a.category_name || '';
+            const catB = b.category_name || '';
+            if (catA !== catB) return catA.localeCompare(catB);
+            return a.product_name.localeCompare(b.product_name);
         });
 
         // Paginate
@@ -288,9 +265,12 @@ function initDashboard() {
                 return d !== null && d <= 2;
             });
 
-            // Master Row
+            // Master Row — strong red background if any batch expires within 2 days
             const tr = document.createElement('tr');
-            tr.className = `hover:bg-slate-50 transition-colors group border-b border-slate-100 ${isExpiringSoonOverall ? 'bg-rose-50/30' : ''}`;
+            tr.className = `transition-colors group border-b border-slate-100 ${isExpiringSoonOverall
+                    ? 'bg-rose-100 hover:bg-rose-200'
+                    : 'hover:bg-slate-50'
+                }`;
 
             const imgCellHtml = product.image_url
                 ? `<img src="${product.image_url}" class="h-10 w-10 object-contain rounded bg-white border border-slate-200 p-0.5">`
@@ -404,27 +384,15 @@ function initDashboard() {
         renderData();
     });
 
-    const sortDropdownContainer = document.getElementById('sortDropdownContainer');
-    const sortMenu = document.getElementById('sortMenu');
-    const btnSort = document.getElementById('btnSort');
-    const sortLabel = document.getElementById('sortLabel');
-
-    btnSort.addEventListener('click', (e) => {
-        e.stopPropagation();
-        sortMenu.classList.toggle('hidden');
-    });
-
-    document.addEventListener('click', () => {
-        sortMenu.classList.add('hidden');
-    });
-
-    sortMenu.querySelectorAll('[data-sort]').forEach(item => {
-        item.addEventListener('click', (e) => {
-            currentSort = e.target.dataset.sort;
-            sortLabel.textContent = `เรียง: ${e.target.textContent}`;
+    // Search box
+    const searchBox = document.getElementById('productSearchBox');
+    if (searchBox) {
+        searchBox.addEventListener('input', (e) => {
+            currentSearch = e.target.value.toLowerCase().trim();
+            currentPage = 1;
             renderData();
         });
-    });
+    }
 
     // Custom Add Product Modal Logic
     const btnAddProduct = document.getElementById('btnAddProduct');

@@ -14,15 +14,6 @@
                         <h1 class="text-2xl font-bold text-slate-900">แผงควบคุมผู้ดูแลระบบ</h1>
                         <p class="text-sm text-slate-500 mt-1">ภาพรวมและสถิติการทำงานของคลังสินค้า</p>
                     </div>
-                    <button id="btnReseedStock"
-                        class="shrink-0 flex items-center px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-400">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
-                            </path>
-                        </svg>
-                        สุ่มสต็อกสินค้าใหม่ทั้งหมด
-                    </button>
                 </div>
 
                 <!-- Tab Navigation -->
@@ -31,12 +22,12 @@
                         <button
                             class="admin-tab active-tab px-5 py-3 text-sm font-semibold text-emerald-700 border-b-2 border-emerald-600 whitespace-nowrap"
                             data-tab="stats">
-                            📊 สถิติการขาย
+                            สถิติการขาย
                         </button>
                         <button
                             class="admin-tab px-5 py-3 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent hover:border-slate-300 whitespace-nowrap"
                             data-tab="users">
-                            👤 จัดการผู้ใช้งาน
+                            จัดการผู้ใช้งาน
                         </button>
                     </nav>
                 </div>
@@ -67,9 +58,7 @@
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         <!-- Top 5 Sellers Chart -->
                         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                                <span class="text-xl">🏆</span> 5 อันดับสินค้าขายดีสุด
-                            </h2>
+                            <h2 class="text-base font-semibold text-slate-800 mb-4">5 อันดับสินค้าขายดีสุด</h2>
                             <div class="relative h-64">
                                 <canvas id="chartTop5"></canvas>
                                 <p id="chartTop5Empty"
@@ -80,9 +69,7 @@
 
                         <!-- Worst 5 Sellers Chart -->
                         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                                <span class="text-xl">📉</span> 5 อันดับสินค้าขายช้าสุด
-                            </h2>
+                            <h2 class="text-base font-semibold text-slate-800 mb-4">5 อันดับสินค้าขายช้าสุด</h2>
                             <div class="relative h-64">
                                 <canvas id="chartWorst5"></canvas>
                                 <p id="chartWorst5Empty"
@@ -315,30 +302,6 @@
                     } catch (e) { console.error(e); }
                 }
 
-                // --- Reseed Stock ---
-                document.getElementById('btnReseedStock').addEventListener('click', async () => {
-                    const conf = await Swal.fire({
-                        title: 'ยืนยันการสุ่มสต็อกใหม่?',
-                        text: 'ระบบจะลบสต็อกปัจจุบันทั้งหมดและสุ่มจำนวนใหม่ให้ทุกรายการสินค้า',
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#d97706',
-                        cancelButtonColor: '#64748b',
-                        confirmButtonText: 'ยืนยัน',
-                        cancelButtonText: 'ยกเลิก'
-                    });
-                    if (!conf.isConfirmed) return;
-                    try {
-                        const res = await fetch('/api/admin/reseed-stock', { method: 'POST' });
-                        const data = await res.json();
-                        if (res.ok) {
-                            Swal.fire('สำเร็จ!', data.message, 'success');
-                            loadStats();
-                        } else {
-                            Swal.fire('ผิดพลาด', data.error, 'error');
-                        }
-                    } catch (e) { Swal.fire('ผิดพลาด', 'ระบบขัดข้อง', 'error'); }
-                });
 
                 // --- User Management ---
                 function loadUsers() {
