@@ -487,6 +487,55 @@ app.post('/api/stock/withdraw', requireAuth, (req, res) => {
     });
 });
 
+
+// ==========================================
+// Delete Expired Products (All or by Category)
+// ==========================================
+app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
+    const { category, expired_batches } = req.body;
+    
+    if (!expired_batches || !Array.isArray(expired_batches) || expired_batches.length === 0) {
+        return res.status(400).json({ error: "ไม่มีรายการสินค้าที่เลือก (No items selected)" });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        const stmtDelete = db.prepare('DELETE FROM Stock WHERE id = ?');
+        const stmtLog = db.prepare(`
+            INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) 
+            VALUES ('EXPIRED', ?, ?, ?, ?, ?)
+        `);
+        
+        const timestamp = getBangkokTimestamp();
+        let errorOccurred = false;
+
+        expired_batches.forEach(batch => {
+            // batch = { stock_id, product_id, quantity, expiry_date, product_name }
+            stmtDelete.run([batch.stock_id], (err) => {
+                if (err) errorOccurred = true;
+            });
+            
+            // Log format requirement: "หมดวันไหน กี่จำนวน"
+            const extraInfo = `${batch.product_name} | หมดอายุ: ${batch.expiry_date}`;
+            stmtLog.run([batch.product_id, batch.quantity, req.session.user.username, timestamp, extraInfo], (err) => {
+                if (err) errorOccurred = true;
+            });
+        });
+
+        stmtDelete.finalize();
+        stmtLog.finalize();
+
+        db.run('COMMIT', (err) => {
+            if (err || errorOccurred) {
+                db.run('ROLLBACK');
+                return res.status(500).json({ error: "เกิดข้อผิดพลาดในการลบสินค้า" });
+            }
+            res.json({ message: `ลบสินค้าหมดอายุ ${expired_batches.length} ล็อตสำเร็จ` });
+        });
+    });
+});
+
 app.get('/api/history', requireAuth, (req, res) => {
     const query = `
         SELECT t.id, t.action_date, t.action_type,
