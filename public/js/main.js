@@ -70,6 +70,7 @@ function initDashboard() {
     let currentView = 'grid'; // default
     let currentSearch = '';
     let currentCategory = 'all';
+    let currentSort = 'name-asc';
     let currentPage = 1;
     const PAGE_SIZE = 100;
 
@@ -94,6 +95,7 @@ function initDashboard() {
             if (!res.ok) throw new Error('Failed to load inventory');
             inventoryData = await res.json();
             buildCategoryTabs();
+            updateExpiryBanner();
             renderData();
         } catch (err) {
             console.error(err);
@@ -101,6 +103,34 @@ function initDashboard() {
             emptyState.classList.remove('hidden');
         } finally {
             loadingIndicator.classList.add('hidden');
+        }
+    }
+
+
+    // ---- Expiry Banner ----
+    function updateExpiryBanner() {
+        const banner = document.getElementById('expiryBanner');
+        const bannerText = document.getElementById('expiryBannerText');
+        if (!banner || !bannerText) return;
+        const expiredToday = inventoryData.filter(p =>
+            p.batches.some(b => {
+                const d = getDaysRemaining(b.expiry_date);
+                return d !== null && d <= 0;
+            })
+        );
+        if (expiredToday.length > 0) {
+            const names = expiredToday.slice(0, 3).map(p => p.product_name).join(', ');
+            const more = expiredToday.length > 3 ? (' และอีก ' + (expiredToday.length - 3) + ' รายการ') : '';
+            bannerText.innerHTML = '<strong>แจ้งเตือน:</strong> มีสินค้าหมดอายุหรือหมดอายุวันนี้ <strong>' + expiredToday.length + ' รายการ</strong> — ' + names + more;
+            banner.classList.remove('hidden');
+        } else {
+            banner.classList.add('hidden');
+        }
+        const btnDismiss = document.getElementById('btnDismissExpiry');
+        if (btnDismiss) {
+            const newBtn = btnDismiss.cloneNode(true);
+            btnDismiss.parentNode.replaceChild(newBtn, btnDismiss);
+            newBtn.addEventListener('click', () => banner.classList.add('hidden'));
         }
     }
 
@@ -145,12 +175,28 @@ function initDashboard() {
             return matchCat && matchSearch;
         });
 
-        // Default sort: category then name
+        // Sort
         const sortedData = [...filtered].sort((a, b) => {
-            const catA = a.category_name || '';
-            const catB = b.category_name || '';
-            if (catA !== catB) return catA.localeCompare(catB);
-            return a.product_name.localeCompare(b.product_name);
+            if (currentSort === 'name-desc') {
+                return b.product_name.localeCompare(a.product_name, 'th');
+            } else if (currentSort === 'expiry-asc') {
+                const getNearest = (p) => {
+                    let min = null;
+                    p.batches.forEach(batch => {
+                        const d = getDaysRemaining(batch.expiry_date);
+                        if (d !== null && (min === null || d < min)) min = d;
+                    });
+                    return min;
+                };
+                const da = getNearest(a);
+                const db2 = getNearest(b);
+                if (da === null && db2 === null) return 0;
+                if (da === null) return 1;
+                if (db2 === null) return -1;
+                return da - db2;
+            } else {
+                return a.product_name.localeCompare(b.product_name, 'th');
+            }
         });
 
         // Paginate
@@ -383,6 +429,16 @@ function initDashboard() {
         btnGridView.parentElement.classList.replace('bg-white', 'bg-slate-100');
         renderData();
     });
+
+    // Sort select
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', () => {
+            currentSort = sortSelect.value;
+            currentPage = 1;
+            renderData();
+        });
+    }
 
     // Search box
     const searchBox = document.getElementById('productSearchBox');
@@ -701,23 +757,48 @@ function initHistoryPage() {
             pageData.forEach(log => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100/60';
-                const d = new Date(log.action_date);
-                const formattedDate = d.toLocaleString('th-TH', {
+
+                // Parse Bangkok-stored datetime (stored as 'YYYY-MM-DD HH:MM:SS' Bangkok local)
+                const rawDate = (log.action_date || '');
+                const d = new Date(rawDate.replace(' ', 'T') + '+07:00');
+                const formattedDate = isNaN(d.getTime()) ? rawDate : d.toLocaleString('th-TH', {
                     day: '2-digit', month: 'short', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
+                    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok'
                 });
-                const isAdd = log.action_type === 'ADD';
-                const actionBadge = isAdd
-                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">รับเข้า (ADD)</span>`
-                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">เบิกออก (WITHDRAW)</span>`;
+
+                const actionType = log.action_type || '';
+                let actionBadge = '';
+                let quantityHtml = '-';
+                let productDisplay = log.product_name || '-';
+
+                if (actionType === 'ADD') {
+                    actionBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">รับเข้า (ADD)</span>`;
+                    quantityHtml = `<span class="font-mono font-bold text-emerald-600">+${log.quantity ?? ''}</span>`;
+                } else if (actionType === 'WITHDRAW') {
+                    actionBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">เบิกออก (WITHDRAW)</span>`;
+                    quantityHtml = `<span class="font-mono font-bold text-rose-600">-${log.quantity ?? ''}</span>`;
+                } else if (actionType === 'CREATE_USER') {
+                    actionBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">สร้างผู้ใช้</span>`;
+                    productDisplay = log.extra_info ? `<span class="text-sky-700">${log.extra_info}</span>` : '-';
+                } else if (actionType === 'DELETE_USER') {
+                    actionBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">ลบผู้ใช้</span>`;
+                    productDisplay = log.extra_info ? `<span class="text-orange-700">${log.extra_info}</span>` : '-';
+                } else if (actionType === 'CREATE_PRODUCT') {
+                    actionBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">สร้างสินค้า</span>`;
+                    productDisplay = log.extra_info || log.product_name || '-';
+                } else if (actionType === 'DELETE_PRODUCT') {
+                    actionBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">ลบสินค้ส</span>`;
+                    productDisplay = log.extra_info ? `<span class="text-amber-700">${log.extra_info}</span>` : '-';
+                } else {
+                    actionBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">${actionType}</span>`;
+                }
+
                 tr.innerHTML = `
                     <td class="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">${formattedDate}</td>
                     <td class="px-6 py-4">${actionBadge}</td>
-                    <td class="px-6 py-4 font-medium text-slate-800">${log.product_name}</td>
-                    <td class="px-6 py-4 text-right font-mono font-bold ${isAdd ? 'text-emerald-600' : 'text-rose-600'}">
-                        ${isAdd ? '+' : '-'}${log.quantity}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-slate-600">${log.actor_name}</td>
+                    <td class="px-6 py-4 font-medium text-slate-800">${productDisplay}</td>
+                    <td class="px-6 py-4 text-right">${quantityHtml}</td>
+                    <td class="px-6 py-4 text-sm text-slate-600">${log.actor_name || '-'}</td>
                 `;
                 tableBody.appendChild(tr);
             });
