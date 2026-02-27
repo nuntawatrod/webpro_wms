@@ -61,6 +61,72 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// --- Custom Confirmation Modal Helper ---
+function showDeleteConfirmModal(message, onConfirm) {
+    const overlay = document.getElementById('deleteConfirmModalOverlay');
+    const content = document.getElementById('deleteConfirmModalContent');
+    const msgEl = document.getElementById('deleteConfirmMessage');
+    const btnCancel = document.getElementById('btnCancelDelete');
+    const btnConfirm = document.getElementById('btnConfirmDeleteAction');
+
+    if (!overlay || !content) return;
+
+    msgEl.textContent = message;
+
+    // Remove old listeners by cloning
+    const newBtnConfirm = btnConfirm.cloneNode(true);
+    btnConfirm.parentNode.replaceChild(newBtnConfirm, btnConfirm);
+
+    const newBtnCancel = btnCancel.cloneNode(true);
+    btnCancel.parentNode.replaceChild(newBtnCancel, btnCancel);
+
+    // Attempt to grab the close icon specifically
+    const btnCloseIcon = document.getElementById('btnCloseDeleteIcon');
+    let newBtnCloseIcon = null;
+    if (btnCloseIcon) {
+        newBtnCloseIcon = btnCloseIcon.cloneNode(true);
+        btnCloseIcon.parentNode.replaceChild(newBtnCloseIcon, btnCloseIcon);
+    }
+
+    function closeModal() {
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            content.style.display = 'none';
+            content.classList.remove('scale-95', 'opacity-0');
+        }, 150);
+    }
+
+    // Add new listeners
+    newBtnCancel.addEventListener('click', closeModal);
+    if (newBtnCloseIcon) {
+        newBtnCloseIcon.addEventListener('click', closeModal);
+    }
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal();
+    });
+
+    newBtnConfirm.addEventListener('click', async () => {
+        // loading state
+        newBtnConfirm.disabled = true;
+        newBtnConfirm.innerHTML = `<svg class="animate-spin h-4 w-4 mr-1 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> กำลังลบ...`;
+
+        await onConfirm();
+
+        closeModal();
+
+        // Reset button state slightly after modal closes
+        setTimeout(() => {
+            newBtnConfirm.disabled = false;
+            newBtnConfirm.innerHTML = `ยืนยันการลบ`;
+        }, 300);
+    });
+
+    // Show modal
+    overlay.classList.remove('hidden');
+    content.style.display = 'block';
+}
+
 
 // ============================================
 // DASHBOARD (/)
@@ -124,6 +190,18 @@ function initDashboard() {
         }
     }
 
+    async function reloadInventorySilently() {
+        try {
+            const res = await fetch(`${API_BASE}/inventory`);
+            if (res.ok) {
+                inventoryData = await res.json();
+                updateExpiryBanner();
+                renderData();
+            }
+        } catch (err) {
+            console.error('Silent reload failed', err);
+        }
+    }
 
     // ---- Expiry Banner ----
     function updateExpiryBanner() {
@@ -187,10 +265,13 @@ function initDashboard() {
         emptyState.classList.add('hidden');
 
         // Filter: split expired vs active
-        const isProductExpired = (p) => p.batches.every(b => {
-            const d = getDaysRemaining(b.expiry_date);
-            return d !== null && d < 0;
-        });
+        const isProductExpired = (p) => {
+            if (!p.batches || p.batches.length === 0) return false;
+            return p.batches.every(b => {
+                const d = getDaysRemaining(b.expiry_date);
+                return d !== null && d < 0;
+            });
+        };
 
         const filtered = inventoryData.filter(p => {
             const matchCat = currentCategory === 'all' || (p.category_name || 'ทั่วไป') === currentCategory;
@@ -299,41 +380,42 @@ function initDashboard() {
 
             const btnDeleteAll = header.querySelector('#btnDeleteAllExpired');
             if (btnDeleteAll) {
-                btnDeleteAll.addEventListener('click', async () => {
-                    if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`)) return;
+                btnDeleteAll.addEventListener('click', () => {
+                    const confirmMessage = `คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`;
+                    showDeleteConfirmModal(confirmMessage, async () => {
+                        const batchesToDelete = [];
+                        data.forEach(p => {
+                            p.batches.forEach(b => {
+                                const d = getDaysRemaining(b.expiry_date);
+                                if (d !== null && d < 0) {
+                                    batchesToDelete.push({
+                                        stock_id: b.stock_id,
+                                        product_id: p.id,
+                                        product_name: p.product_name,
+                                        quantity: b.quantity,
+                                        expiry_date: b.expiry_date
+                                    });
+                                }
+                            });
+                        });
 
-                    const batchesToDelete = [];
-                    data.forEach(p => {
-                        p.batches.forEach(b => {
-                            const d = getDaysRemaining(b.expiry_date);
-                            if (d !== null && d < 0) {
-                                batchesToDelete.push({
-                                    stock_id: b.stock_id,
-                                    product_id: p.id,
-                                    product_name: p.product_name,
-                                    quantity: b.quantity,
-                                    expiry_date: b.expiry_date
-                                });
+                        try {
+                            const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                            });
+                            const result = await res.json();
+                            if (res.ok) {
+                                showToast(result.message || 'ลบสำเร็จ', 'success');
+                                reloadInventorySilently(); // Reload without UI jump
+                            } else {
+                                alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
                             }
-                        });
-                    });
-
-                    try {
-                        const res = await fetch(`${API_BASE}/stock/delete-expired`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
-                        });
-                        const result = await res.json();
-                        if (res.ok) {
-                            alert(result.message || 'ลบสำเร็จ');
-                            fetchInventory(); // Reload everything
-                        } else {
-                            alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                        } catch (err) {
+                            alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
                         }
-                    } catch (err) {
-                        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                    }
+                    });
                 });
             }
         }
@@ -453,23 +535,24 @@ function initDashboard() {
                 if (!batchesStr) return;
                 const batchesToDelete = JSON.parse(batchesStr);
 
-                if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุรายการนี้ (${batchesToDelete.length} ล็อต)?`)) return;
-
-                try {
-                    const res = await fetch(`${API_BASE}/stock/delete-expired`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
-                    });
-                    const result = await res.json();
-                    if (res.ok) {
-                        fetchInventory(); // Reload everything
-                    } else {
-                        alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                showDeleteConfirmModal(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุรายการนี้ (${batchesToDelete.length} ล็อต)?`, async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                        });
+                        const result = await res.json();
+                        if (res.ok) {
+                            showToast('ลบรายการสำเร็จ', 'success');
+                            reloadInventorySilently(); // Reload without UI jump
+                        } else {
+                            alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                        }
+                    } catch (err) {
+                        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
                     }
-                } catch (err) {
-                    alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                }
+                });
             });
         });
     }
@@ -510,41 +593,42 @@ function initDashboard() {
             // Wire up the button
             const btnDeleteAll = trHeader.querySelector('#btnDeleteAllExpiredTable');
             if (btnDeleteAll) {
-                btnDeleteAll.addEventListener('click', async () => {
-                    if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`)) return;
+                btnDeleteAll.addEventListener('click', () => {
+                    const confirmMessage = `คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`;
+                    showDeleteConfirmModal(confirmMessage, async () => {
+                        const batchesToDelete = [];
+                        data.forEach(p => {
+                            p.batches.forEach(b => {
+                                const d = getDaysRemaining(b.expiry_date);
+                                if (d !== null && d < 0) {
+                                    batchesToDelete.push({
+                                        stock_id: b.stock_id,
+                                        product_id: p.id,
+                                        product_name: p.product_name,
+                                        quantity: b.quantity,
+                                        expiry_date: b.expiry_date
+                                    });
+                                }
+                            });
+                        });
 
-                    const batchesToDelete = [];
-                    data.forEach(p => {
-                        p.batches.forEach(b => {
-                            const d = getDaysRemaining(b.expiry_date);
-                            if (d !== null && d < 0) {
-                                batchesToDelete.push({
-                                    stock_id: b.stock_id,
-                                    product_id: p.id,
-                                    product_name: p.product_name,
-                                    quantity: b.quantity,
-                                    expiry_date: b.expiry_date
-                                });
+                        try {
+                            const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                            });
+                            const result = await res.json();
+                            if (res.ok) {
+                                showToast(result.message || 'ลบสำเร็จ', 'success');
+                                reloadInventorySilently(); // Reload without UI jump
+                            } else {
+                                alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
                             }
-                        });
-                    });
-
-                    try {
-                        const res = await fetch(`${API_BASE}/stock/delete-expired`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
-                        });
-                        const result = await res.json();
-                        if (res.ok) {
-                            alert(result.message || 'ลบสำเร็จ');
-                            fetchInventory(); // Reload everything
-                        } else {
-                            alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                        } catch (err) {
+                            alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
                         }
-                    } catch (err) {
-                        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                    }
+                    });
                 });
             }
         }
@@ -692,23 +776,24 @@ function initDashboard() {
                 if (!batchesStr) return;
                 const batchesToDelete = JSON.parse(batchesStr);
 
-                if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุรายการนี้ (${batchesToDelete.length} ล็อต)?`)) return;
-
-                try {
-                    const res = await fetch(`${API_BASE}/stock/delete-expired`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
-                    });
-                    const result = await res.json();
-                    if (res.ok) {
-                        fetchInventory(); // Reload everything
-                    } else {
-                        alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                showDeleteConfirmModal(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุรายการนี้ (${batchesToDelete.length} ล็อต)?`, async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                        });
+                        const result = await res.json();
+                        if (res.ok) {
+                            showToast('ลบรายการสำเร็จ', 'success');
+                            reloadInventorySilently(); // Reload without UI jump
+                        } else {
+                            alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                        }
+                    } catch (err) {
+                        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
                     }
-                } catch (err) {
-                    alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                }
+                });
             });
         });
     }

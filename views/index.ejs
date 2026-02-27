@@ -266,6 +266,39 @@
                 </div>
             </div>
 
+            <!-- Custom Modal Overlay: Delete Confirm -->
+            <div id="deleteConfirmModalOverlay"
+                class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+                <div id="deleteConfirmModalContent"
+                    class="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in"
+                    style="display: none;">
+
+                    <div class="px-6 py-5 flex justify-between items-center bg-white">
+                        <h2 class="text-lg font-bold text-slate-700">ยืนยันการลบ (Confirm Delete)</h2>
+                        <button id="btnCloseDeleteIcon"
+                            class="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="px-6 pb-6 pt-2">
+                        <p id="deleteConfirmMessage" class="text-slate-600 text-[15px] leading-relaxed"></p>
+                    </div>
+
+                    <div class="px-6 py-5 bg-white flex justify-center space-x-3 mb-2">
+                        <button id="btnCancelDelete"
+                            class="px-5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors focus:outline-none">ยกเลิก
+                            (Cancel)</button>
+                        <button id="btnConfirmDeleteAction"
+                            class="px-5 py-2.5 bg-[#7dcbaa] rounded-xl text-sm font-medium text-white hover:bg-[#68bc94] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#7dcbaa]">
+                            ยืนยันการลบ
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Pass Auth info to JS safely -->
             <script>
                 const AUTH_USER = {
