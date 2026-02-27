@@ -72,6 +72,7 @@ function initDashboard() {
     let currentCategory = 'all';
     let currentSort = 'name-asc';
     let currentPage = 1;
+    let showExpiredMode = false;
     const PAGE_SIZE = 100;
 
     const gridView = document.getElementById('gridView');
@@ -81,6 +82,23 @@ function initDashboard() {
     const btnTableView = document.getElementById('btnTableView');
     const emptyState = document.getElementById('emptyState');
     const loadingIndicator = document.getElementById('loadingIndicator');
+
+    // Toggle expired view
+    const btnToggleExpired = document.getElementById('btnToggleExpired');
+    if (btnToggleExpired) {
+        btnToggleExpired.addEventListener('click', () => {
+            showExpiredMode = !showExpiredMode;
+            currentPage = 1;
+            if (showExpiredMode) {
+                btnToggleExpired.className = 'border border-rose-400 text-rose-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-rose-50 shadow-sm transition-all flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-400';
+                btnToggleExpired.innerHTML = `<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>กลับสินค้าปกติ`;
+            } else {
+                btnToggleExpired.className = 'border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-100 shadow-sm transition-all flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400';
+                btnToggleExpired.innerHTML = `<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>ดูสินค้าหมดอายุ`;
+            }
+            renderData();
+        });
+    }
 
     fetchInventory();
 
@@ -168,11 +186,17 @@ function initDashboard() {
         }
         emptyState.classList.add('hidden');
 
-        // Filter by category then search
+        // Filter: split expired vs active
+        const isProductExpired = (p) => p.batches.every(b => {
+            const d = getDaysRemaining(b.expiry_date);
+            return d !== null && d < 0;
+        });
+
         const filtered = inventoryData.filter(p => {
             const matchCat = currentCategory === 'all' || (p.category_name || 'ทั่วไป') === currentCategory;
             const matchSearch = currentSearch === '' || p.product_name.toLowerCase().includes(currentSearch);
-            return matchCat && matchSearch;
+            const expired = isProductExpired(p);
+            return matchCat && matchSearch && (showExpiredMode ? expired : !expired);
         });
 
         // Sort
@@ -247,52 +271,96 @@ function initDashboard() {
     function renderGrid(data) {
         gridView.innerHTML = '';
 
+        // Expired mode header
+        if (showExpiredMode) {
+            const header = document.createElement('div');
+            header.className = 'col-span-full mb-4 px-4 py-3 bg-slate-100 border border-slate-300 rounded-xl text-slate-500 text-sm font-medium flex items-center gap-2';
+            header.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>แสดงสินค้าที่หมดอายุแล้วทั้งหมด ${data.length} รายการ`;
+            gridView.appendChild(header);
+        }
+
         data.forEach(product => {
-            let isExpiringSoon = false;
             let nearestExpiryDay = null;
+            let isExpired = false;
 
             product.batches.forEach(b => {
                 if (b.expiry_date) {
                     const days = getDaysRemaining(b.expiry_date);
                     if (days !== null) {
                         if (nearestExpiryDay === null || days < nearestExpiryDay) nearestExpiryDay = days;
-                        if (days <= 2) isExpiringSoon = true;
                     }
                 }
             });
 
-            const card = document.createElement('div');
-            card.className = `product-card bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col relative ${isExpiringSoon ? 'border-rose-300 ring-1 ring-rose-300' : 'border-slate-200'}`;
+            isExpired = nearestExpiryDay !== null && nearestExpiryDay < 0;
+            const isDanger = !isExpired && nearestExpiryDay !== null && nearestExpiryDay <= 1;   // 1 day → red
+            const isWarning = !isExpired && nearestExpiryDay !== null && nearestExpiryDay <= 3 && nearestExpiryDay >= 2; // 2-3 days → yellow
 
-            const badgeHTML = isExpiringSoon ?
-                `<div class="absolute top-3 right-3 bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center">
-                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            let cardBorderClass = 'border-slate-200';
+            if (isExpired) cardBorderClass = 'border-slate-300 ring-1 ring-slate-300 opacity-70';
+            else if (isDanger) cardBorderClass = 'border-rose-400 ring-1 ring-rose-400';
+            else if (isWarning) cardBorderClass = 'border-amber-400 ring-1 ring-amber-400';
+
+            let cardBgClass = isExpired ? 'bg-slate-100' : 'bg-white';
+
+            const card = document.createElement('div');
+            card.className = `product-card ${cardBgClass} rounded-xl shadow-sm border overflow-hidden flex flex-col relative ${cardBorderClass}`;
+
+            // Badge
+            let badgeHTML = '';
+            if (isExpired) {
+                badgeHTML = `<div class="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                    หมดอายุ
+                </div>`;
+            } else if (isDanger) {
+                badgeHTML = `<div class="absolute top-3 right-3 bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     ใกล้หมดอายุ (${nearestExpiryDay} วัน)
-                 </div>` : '';
+                </div>`;
+            } else if (isWarning) {
+                badgeHTML = `<div class="absolute top-3 right-3 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    ใกล้หมดอายุ (${nearestExpiryDay} วัน)
+                </div>`;
+            }
+
+            // Expiry display
+            let expiryDisplay = '';
+            if (nearestExpiryDay !== null) {
+                if (nearestExpiryDay < 0) {
+                    expiryDisplay = `<p class="text-xs text-slate-400 font-semibold mt-1">หมดอายุ</p>`;
+                } else if (isDanger) {
+                    expiryDisplay = `<p class="text-xs text-rose-500 font-semibold mt-1">เหลือ ${nearestExpiryDay} วัน</p>`;
+                } else if (isWarning) {
+                    expiryDisplay = `<p class="text-xs text-amber-600 font-semibold mt-1">เหลือ ${nearestExpiryDay} วัน</p>`;
+                }
+            }
 
             card.innerHTML = `
                 ${badgeHTML}
                 <div class="absolute top-3 left-3 bg-white/90 backdrop-blur text-slate-700 text-xs font-semibold px-2 py-1 rounded shadow-sm z-10 border border-slate-100">
                     ${product.category_name || 'ทั่วไป'}
                 </div>
-                <div class="h-48 bg-slate-100 overflow-hidden flex items-center justify-center p-4">
+                <div class="h-48 ${isExpired ? 'bg-slate-200 grayscale' : 'bg-slate-100'} overflow-hidden flex items-center justify-center p-4">
                     ${product.image_url
                     ? `<img src="${product.image_url}" alt="${product.product_name}" class="object-contain h-full w-full mix-blend-multiply">`
-                    : `<svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`
+                    : `<svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`
                 }
                 </div>
                 <div class="p-5 flex-grow flex flex-col">
-                    <h3 class="font-semibold text-slate-800 text-base leading-snug mb-2 line-clamp-2" title="${product.product_name}">${product.product_name}</h3>
-                    
+                    <h3 class="font-semibold ${isExpired ? 'text-slate-400' : 'text-slate-800'} text-base leading-snug mb-1 line-clamp-2" title="${product.product_name}">${product.product_name}</h3>
+                    ${expiryDisplay}
                     <div class="mt-auto pt-4 border-t border-slate-100 flex justify-between items-end">
                         <div>
                             <p class="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">จำนวนคงเหลือ</p>
-                            <p class="text-2xl font-bold ${product.total_quantity === 0 ? 'text-rose-500' : 'text-emerald-600'}">${product.total_quantity}</p>
+                            <p class="text-2xl font-bold ${isExpired ? 'text-slate-400' : (product.total_quantity === 0 ? 'text-rose-500' : 'text-emerald-600')}">${product.total_quantity}</p>
                         </div>
                         <div class="text-right">
-                            <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
-                                ${product.total_quantity > 0 ? 'มีสินค้า' : 'สินค้าหมด'}
-                            </span>
+                            ${isExpired
+                    ? `<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-400">หมดอายุ</span>`
+                    : `<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">${product.total_quantity > 0 ? 'มีสินค้า' : 'สินค้าหมด'}</span>`
+                }
                         </div>
                     </div>
                 </div>
@@ -305,18 +373,25 @@ function initDashboard() {
         tableBody.innerHTML = '';
 
         data.forEach(product => {
-            const isExpiringSoonOverall = product.batches.some(b => {
-                if (!b.expiry_date) return false;
-                const d = getDaysRemaining(b.expiry_date);
-                return d !== null && d <= 2;
-            });
+            const nearestDay = (() => {
+                let min = null;
+                product.batches.forEach(b => {
+                    const d = getDaysRemaining(b.expiry_date);
+                    if (d !== null && (min === null || d < min)) min = d;
+                });
+                return min;
+            })();
 
-            // Master Row — strong red background if any batch expires within 2 days
+            const isExpiredProduct = nearestDay !== null && nearestDay < 0;
+            const isDanger = !isExpiredProduct && nearestDay !== null && nearestDay <= 1;
+            const isWarning = !isExpiredProduct && nearestDay !== null && nearestDay <= 3 && nearestDay >= 2;
+
             const tr = document.createElement('tr');
-            tr.className = `transition-colors group border-b border-slate-100 ${isExpiringSoonOverall
-                ? 'bg-rose-100 hover:bg-rose-200'
-                : 'hover:bg-slate-50'
-                }`;
+            let rowBg = 'hover:bg-slate-50';
+            if (isExpiredProduct) rowBg = 'bg-slate-100 text-slate-400 hover:bg-slate-200';
+            else if (isDanger) rowBg = 'bg-rose-50 hover:bg-rose-100';
+            else if (isWarning) rowBg = 'bg-amber-50 hover:bg-amber-100';
+            tr.className = `transition-colors group border-b border-slate-100 ${rowBg}`;
 
             const imgCellHtml = product.image_url
                 ? `<img src="${product.image_url}" class="h-10 w-10 object-contain rounded bg-white border border-slate-200 p-0.5">`
