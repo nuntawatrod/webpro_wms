@@ -394,8 +394,28 @@ function initDashboard() {
                 }
             }
 
+            let deleteBtnHTML = '';
+            if (isExpired && showExpiredMode) {
+                // Determine the specific expired batches for this product to delete
+                const expiredBatchesStr = JSON.stringify(product.batches.filter(b => {
+                    const d = getDaysRemaining(b.expiry_date);
+                    return d !== null && d < 0;
+                }).map(b => ({
+                    stock_id: b.stock_id,
+                    product_id: product.id,
+                    product_name: product.product_name,
+                    quantity: b.quantity,
+                    expiry_date: b.expiry_date
+                }))).replace(/"/g, '&quot;');
+
+                deleteBtnHTML = `<button class="absolute top-12 right-3 bg-rose-50 hover:bg-rose-100 text-rose-600 p-1.5 rounded-full shadow-sm z-10 transition-colors btn-delete-single" data-batches="${expiredBatchesStr}" title="ลบสินค้าหมดอายุรายการนี้">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>`;
+            }
+
             card.innerHTML = `
                 ${badgeHTML}
+                ${deleteBtnHTML}
                 <div class="absolute top-3 left-3 bg-white/90 backdrop-blur text-slate-700 text-xs font-semibold px-2 py-1 rounded shadow-sm z-10 border border-slate-100">
                     ${product.category_name || 'ทั่วไป'}
                 </div>
@@ -423,6 +443,34 @@ function initDashboard() {
                 </div>
             `;
             gridView.appendChild(card);
+        });
+
+        // Attach event listeners for single delete buttons in grid view
+        document.querySelectorAll('.btn-delete-single').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const batchesStr = e.currentTarget.dataset.batches;
+                if (!batchesStr) return;
+                const batchesToDelete = JSON.parse(batchesStr);
+
+                if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุรายการนี้ (${batchesToDelete.length} ล็อต)?`)) return;
+
+                try {
+                    const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                    });
+                    const result = await res.json();
+                    if (res.ok) {
+                        fetchInventory(); // Reload everything
+                    } else {
+                        alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                    }
+                } catch (err) {
+                    alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                }
+            });
         });
     }
 
@@ -517,28 +565,48 @@ function initDashboard() {
 
             const tr = document.createElement('tr');
             let rowBg = 'hover:bg-slate-50';
-            if (isExpiredProduct) rowBg = 'bg-slate-100 text-slate-400 hover:bg-slate-200';
+            if (isExpiredProduct) rowBg = 'bg-slate-100/50 text-slate-500 hover:bg-slate-100';
             else if (isDanger) rowBg = 'bg-rose-50 hover:bg-rose-100';
             else if (isWarning) rowBg = 'bg-amber-50 hover:bg-amber-100';
             tr.className = `transition-colors group border-b border-slate-100 ${rowBg}`;
 
             const imgCellHtml = product.image_url
-                ? `<img src="${product.image_url}" class="h-10 w-10 object-contain rounded bg-white border border-slate-200 p-0.5">`
+                ? `<img src="${product.image_url}" class="h-10 w-10 object-contain rounded bg-white border border-slate-200 p-0.5 ${isExpiredProduct ? 'grayscale opacity-70' : ''}">`
                 : `<div class="h-10 w-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
+
+            let actionBtnHtml = '';
+            if (isExpiredProduct && showExpiredMode) {
+                const expiredBatchesStr = JSON.stringify(product.batches.filter(b => {
+                    const d = getDaysRemaining(b.expiry_date);
+                    return d !== null && d < 0;
+                }).map(b => ({
+                    stock_id: b.stock_id,
+                    product_id: product.id,
+                    product_name: product.product_name,
+                    quantity: b.quantity,
+                    expiry_date: b.expiry_date
+                }))).replace(/"/g, '&quot;');
+
+                actionBtnHtml = `<button class="btn-delete-single-table text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 focus:outline-none p-1.5 rounded transition-colors mr-2" data-batches="${expiredBatchesStr}" title="ลบสินค้าหมดอายุรายการนี้">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>`;
+            }
 
             tr.innerHTML = `
                 <td class="px-6 py-4">${imgCellHtml}</td>
                 <td class="px-6 py-4">
-                    <div class="font-medium text-slate-800">${product.product_name}</div>
+                    <div class="font-medium ${isExpiredProduct ? 'text-slate-500' : 'text-slate-800'}">${product.product_name}</div>
                     <div class="text-xs text-slate-500 mt-0.5"><span class="bg-slate-100 px-1.5 py-0.5 rounded mr-1">${product.category_name || 'ทั่วไป'}</span> ${product.batches.length} ล็อตการรับ</div>
                 </td>
-                <td class="px-6 py-4 text-right font-semibold ${product.total_quantity === 0 ? 'text-rose-500' : 'text-slate-800'}">${product.total_quantity}</td>
+                <td class="px-6 py-4 text-right font-semibold ${isExpiredProduct ? 'text-slate-500' : (product.total_quantity === 0 ? 'text-rose-500' : 'text-slate-800')}">${product.total_quantity}</td>
                 <td class="px-6 py-4 text-center">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
-                        ${product.total_quantity > 0 ? 'มีสินค้า' : 'หมด'}
-                    </span>
+                    ${isExpiredProduct
+                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600">หมดอายุ</span>`
+                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${product.total_quantity > 0 ? 'มีสินค้า' : 'หมด'}</span>`
+                }
                 </td>
-                <td class="px-6 py-4 text-right">
+                <td class="px-6 py-4 text-right flex items-center justify-end">
+                    ${actionBtnHtml}
                     ${product.batches.length > 0 ? `
                     <button class="btn-expand text-slate-400 hover:text-emerald-600 focus:outline-none p-2 rounded-full hover:bg-emerald-50 transition-colors" data-id="${product.id}">
                         <svg class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -612,6 +680,34 @@ function initDashboard() {
                 } else {
                     targetRow.classList.add('hidden');
                     svg.classList.remove('rotate-180');
+                }
+            });
+        });
+
+        // Attach event listeners for single delete buttons in table view
+        document.querySelectorAll('.btn-delete-single-table').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const batchesStr = e.currentTarget.dataset.batches;
+                if (!batchesStr) return;
+                const batchesToDelete = JSON.parse(batchesStr);
+
+                if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุรายการนี้ (${batchesToDelete.length} ล็อต)?`)) return;
+
+                try {
+                    const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                    });
+                    const result = await res.json();
+                    if (res.ok) {
+                        fetchInventory(); // Reload everything
+                    } else {
+                        alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                    }
+                } catch (err) {
+                    alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
                 }
             });
         });
