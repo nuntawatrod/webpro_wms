@@ -133,6 +133,16 @@ function initializeDatabase() {
             }
         });
 
+        // Migration: add extra_info column to Transactions_Log if missing
+        db.all("PRAGMA table_info(Transactions_Log)", (err, cols) => {
+            if (!err && cols && !cols.find(c => c.name === 'extra_info')) {
+                db.run("ALTER TABLE Transactions_Log ADD COLUMN extra_info TEXT", (alterErr) => {
+                    if (alterErr) console.error("Migration extra_info failed:", alterErr);
+                    else console.log("Migration: Added extra_info column to Transactions_Log.");
+                });
+            }
+        });
+
         // Seed Products if empty
         db.get("SELECT COUNT(*) AS count FROM Products", (err, row) => {
             if (err) {
@@ -147,6 +157,11 @@ function initializeDatabase() {
             }
         });
     });
+}
+
+// Returns current Bangkok time as 'YYYY-MM-DD HH:MM:SS' string
+function getBangkokTimestamp() {
+    return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' }).replace('T', ' ');
 }
 
 function calculateDaysBetween(startDate, endDate) {
@@ -237,9 +252,10 @@ function seedFromCSV() {
                 stmtStock.finalize();
 
                 // Add initial log entries
-                const stmtLog = db.prepare(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name) VALUES ('ADD', (SELECT id FROM Products WHERE product_name = ?), ?, 'System/Setup')`);
+                const seedTs = getBangkokTimestamp();
+                const stmtLog = db.prepare(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date) VALUES ('ADD', (SELECT id FROM Products WHERE product_name = ?), ?, 'System/Setup', ?)`);
                 for (const stock of stockEntries) {
-                    stmtLog.run([stock.product_name, stock.quantity]);
+                    stmtLog.run([stock.product_name, stock.quantity, seedTs]);
                 }
                 stmtLog.finalize();
 
@@ -398,8 +414,8 @@ app.post('/api/stock/add', requireAuth, (req, res) => {
                         return res.status(500).json({ error: "Failed to add stock" });
                     }
                     db.run(
-                        `INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name) VALUES ('ADD', ?, ?, ?)`,
-                        [product_id, quantity, req.session.user.username],
+                        `INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date) VALUES ('ADD', ?, ?, ?, ?)`,
+                        [product_id, quantity, req.session.user.username, getBangkokTimestamp()],
                         function (err2) {
                             if (err2) {
                                 db.run('ROLLBACK');
@@ -449,8 +465,8 @@ app.post('/api/stock/withdraw', requireAuth, (req, res) => {
 
             const executeQueries = (index = 0) => {
                 if (index >= queries.length) {
-                    db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name) VALUES ('WITHDRAW', ?, ?, ?)`,
-                        [product_id, qtyToWithdraw, actor_name],
+                    db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date) VALUES ('WITHDRAW', ?, ?, ?, ?)`,
+                        [product_id, qtyToWithdraw, actor_name, getBangkokTimestamp()],
                         (logErr) => {
                             if (logErr) { db.run('ROLLBACK'); return res.status(500).json({ error: "Failed to log transaction" }); }
                             db.run('COMMIT');
@@ -473,9 +489,11 @@ app.post('/api/stock/withdraw', requireAuth, (req, res) => {
 
 app.get('/api/history', requireAuth, (req, res) => {
     const query = `
-        SELECT t.action_date, t.action_type, p.product_name, t.quantity, t.actor_name
+        SELECT t.id, t.action_date, t.action_type,
+               COALESCE(p.product_name, '[สินค้าที่ถูกลบ]') AS product_name,
+               t.quantity, t.actor_name, t.extra_info
         FROM Transactions_Log t
-        JOIN Products p ON t.product_id = p.id
+        LEFT JOIN Products p ON t.product_id = p.id
         ORDER BY t.action_date DESC
     `;
     db.all(query, [], (err, rows) => {
@@ -537,7 +555,8 @@ app.post('/api/admin/reseed-stock', requireAdmin, (req, res) => {
                     if (err3 || !products.length) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ไม่พบข้อมูลสินค้า' }); }
 
                     const stmtStock = db.prepare(`INSERT INTO Stock (product_id, receive_date, expiry_date, quantity) VALUES (?, ?, ?, ?)`);
-                    const stmtLog = db.prepare(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name) VALUES ('ADD', ?, ?, 'System/Reseed')`);
+                    const reseedTs = getBangkokTimestamp();
+                    const stmtLog = db.prepare(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date) VALUES ('ADD', ?, ?, 'System/Reseed', ?)`);
                     const today = new Date();
 
                     products.forEach(p => {
@@ -551,7 +570,7 @@ app.post('/api/admin/reseed-stock', requireAdmin, (req, res) => {
                         const rd = receiveDate.toISOString().split('T')[0];
                         const ed = expiryDate.toISOString().split('T')[0];
                         stmtStock.run([p.id, rd, ed, qty]);
-                        stmtLog.run([p.id, qty]);
+                        stmtLog.run([p.id, qty, reseedTs]);
                     });
 
                     stmtStock.finalize();
@@ -584,6 +603,9 @@ app.post('/api/admin/users', requireAdmin, (req, res) => {
 
     db.run("INSERT INTO Users (username, password, role) VALUES (?, ?, ?)", [username, hash, uRole], function (err) {
         if (err) return res.status(500).json({ error: "ชื่อผู้ใช้นี้มีอยู่แล้ว หรือเกิดข้อผิดพลาด (Username exists or DB error)" });
+        const newUserId = this.lastID;
+        db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) VALUES ('CREATE_USER', NULL, NULL, ?, ?, ?)`,
+            [req.session.user.username, getBangkokTimestamp(), `${username} (${uRole})`]);
         res.json({ message: "สร้างบัญชีสำเร็จ (User created)" });
     });
 });
@@ -592,9 +614,14 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
     const id = req.params.id;
     // Prevent deleting self here
     if (id == req.session.user.id) return res.status(400).json({ error: "ไม่สามารถลบบัญชีตัวเองได้" });
-    db.run("DELETE FROM Users WHERE id = ?", [id], (err) => {
-        if (err) return res.status(500).json({ error: "ลบไม่สำเร็จ" });
-        res.json({ message: "ลบบัญชีสำเร็จ" });
+    db.get("SELECT username, role FROM Users WHERE id = ?", [id], (err, targetUser) => {
+        if (err || !targetUser) return res.status(404).json({ error: "ไม่พบผู้ใช้" });
+        db.run("DELETE FROM Users WHERE id = ?", [id], (err2) => {
+            if (err2) return res.status(500).json({ error: "ลบไม่สำเร็จ" });
+            db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) VALUES ('DELETE_USER', NULL, NULL, ?, ?, ?)`,
+                [req.session.user.username, getBangkokTimestamp(), `${targetUser.username} (${targetUser.role})`]);
+            res.json({ message: "ลบบัญชีสำเร็จ" });
+        });
     });
 });
 
@@ -648,7 +675,10 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
         [product_name.trim(), parseFloat(price) || 0, (image_url || '').trim(), (category_name || 'ทั่วไป').trim(), parseInt(shelf_life_days) || 7],
         function (err) {
             if (err) return res.status(500).json({ error: 'ชื่อสินค้านี้มีอยู่แล้ว หรือเกิดข้อผิดพลาด' });
-            res.json({ message: 'สร้างสินค้าสำเร็จ', id: this.lastID });
+            const newId = this.lastID;
+            db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) VALUES ('CREATE_PRODUCT', ?, NULL, ?, ?, ?)`,
+                [newId, req.session.user.username, getBangkokTimestamp(), product_name.trim()]);
+            res.json({ message: 'สร้างสินค้าสำเร็จ', id: newId });
         }
     );
 });
@@ -670,20 +700,29 @@ app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
     );
 });
 
-// Delete product (cascade: delete its stock and transaction logs)
+// Delete product (cascade: delete its stock and transaction logs, but keep a DELETE_PRODUCT log)
 app.delete('/api/admin/products/:id', requireAdmin, (req, res) => {
     const id = req.params.id;
-    db.serialize(() => {
-        db.run('BEGIN TRANSACTION');
-        db.run('DELETE FROM Stock WHERE product_id = ?', [id], (err) => {
-            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสต็อกล้มเหลว' }); }
-            db.run('DELETE FROM Transactions_Log WHERE product_id = ?', [id], (err2) => {
-                if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบประวัติล้มเหลว' }); }
-                db.run('DELETE FROM Products WHERE id = ?', [id], function (err3) {
-                    if (err3) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสินค้าล้มเหลว' }); }
-                    if (this.changes === 0) { db.run('ROLLBACK'); return res.status(404).json({ error: 'ไม่พบสินค้า' }); }
-                    db.run('COMMIT');
-                    res.json({ message: 'ลบสินค้าสำเร็จ' });
+    db.get('SELECT product_name FROM Products WHERE id = ?', [id], (err, prod) => {
+        if (err || !prod) return res.status(404).json({ error: 'ไม่พบสินค้า' });
+        const deletedName = prod.product_name;
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION');
+            db.run('DELETE FROM Stock WHERE product_id = ?', [id], (err) => {
+                if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสต็อกล้มเหลว' }); }
+                // Nullify product_id in log so history remains, but remove link
+                db.run('UPDATE Transactions_Log SET product_id = NULL WHERE product_id = ?', [id], (err2) => {
+                    if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: 'อัปเดตประวัติล้มเหลว' }); }
+                    db.run('DELETE FROM Products WHERE id = ?', [id], function (err3) {
+                        if (err3) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสินค้าล้มเหลว' }); }
+                        if (this.changes === 0) { db.run('ROLLBACK'); return res.status(404).json({ error: 'ไม่พบสินค้า' }); }
+                        // Insert DELETE_PRODUCT log after commit
+                        db.run('COMMIT', () => {
+                            db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) VALUES ('DELETE_PRODUCT', NULL, NULL, ?, ?, ?)`,
+                                [req.session.user.username, getBangkokTimestamp(), deletedName]);
+                            res.json({ message: 'ลบสินค้าสำเร็จ' });
+                        });
+                    });
                 });
             });
         });
