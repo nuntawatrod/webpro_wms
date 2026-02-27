@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="th">
+<%- include('layout/head') %>
+
+    <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+        <!-- Navbar -->
+        <%- include('layout/navbar', { activePage: 'add' , user: locals.user }) %>
+
+            <!-- Main Content -->
+            <main class="flex-grow flex items-center justify-center p-4">
+
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100">
+
+                    <div class="bg-slate-50 px-8 py-6 border-b border-slate-100 text-center">
+                        <div
+                            class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mb-4">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4v16m8-8H4"></path>
+                            </svg>
+                        </div>
+                        <h1 class="text-2xl font-bold text-slate-800">เพิ่มสต็อกสินค้า</h1>
+                        <p class="text-sm text-slate-500 mt-1">นำเข้าสินค้าใหม่หรือเพิ่มจำนวนล็อตเดิม</p>
+                    </div>
+
+                    <div class="p-8 space-y-6">
+
+                        <!-- Searchable Dropdown for Product -->
+                        <div class="relative" id="productSearchContainer">
+                            <label class="block text-sm font-medium text-slate-700 mb-1">เลือกสินค้า <span
+                                    class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <input type="text" id="productSearchInput" placeholder="ค้นหาสินค้าหลัก (Search)..."
+                                    class="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm transition-all"
+                                    autocomplete="off">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <input type="hidden" id="selectedProductId">
+                            <div id="productSearchResults"
+                                class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-y-auto max-h-60"
+                                style="scrollbar-width: thin;">
+                            </div>
+                        </div>
+
+                        <!-- Info Alert -->
+                        <div
+                            class="bg-blue-50 border border-blue-100 text-blue-700 px-4 py-3 rounded-lg flex items-start text-sm">
+                            <svg class="w-5 h-5 mr-2 shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                วันหมดอายุของล็อตนี้ จะถูกคำนวณอัตโนมัติจากอายุการเก็บรักษาของสินค้าชนิดนั้น
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-5">
+                            <!-- Receive Date (Auto) -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">วันที่รับเข้า</label>
+                                <input type="text" id="inReceiveDate" readonly
+                                    class="w-full px-3 py-3 bg-slate-50 border border-slate-200 text-slate-500 rounded-lg shadow-sm text-sm cursor-not-allowed">
+                            </div>
+
+                            <!-- Quantity -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">จำนวน <span
+                                        class="text-rose-500">*</span></label>
+                                <input type="number" id="inQuantity" min="1" placeholder="0"
+                                    class="w-full px-3 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm transition-all font-semibold font-mono">
+                            </div>
+                        </div>
+
+                        <!-- Withdrawer Name (For UI consistency) -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ดำเนินการ</label>
+                            <input type="text" value="<%= user ? user.username : '' %>" readonly
+                                class="w-full px-3 py-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg shadow-sm text-sm cursor-not-allowed">
+                        </div>
+
+                    </div>
+
+                    <div class="px-8 py-5 bg-slate-50 border-t border-slate-100 flex justify-end space-x-3">
+                        <button id="btnCancelAdd"
+                            class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200">ล้างข้อมูล</button>
+                        <button id="btnConfirmAdd"
+                            class="px-5 py-2.5 bg-emerald-600 rounded-lg text-sm font-medium text-white hover:bg-emerald-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                            ยืนยันเพิ่มสต็อก
+                        </button>
+                    </div>
+
+                </div>
+            </main>
+
+            <!-- Notification Area -->
+            <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+            <script>
+                const AUTH_USER = { username: "<%= locals.user ? locals.user.username : '' %>", role: "<%= locals.user ? locals.user.role : '' %>" };
+            </script>
+            <script src="/js/main.js"></script>
+    </body>
+
+</html>
