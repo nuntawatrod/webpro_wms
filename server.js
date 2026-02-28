@@ -300,19 +300,20 @@ app.post('/logout', (req, res) => {
 
 // Dashboard Main (Index)
 app.get('/', requireAuth, (req, res) => {
-    res.render('index');
+    res.render('index', { activePage: 'dashboard' });
 });
 
-// Withdraw Page
 app.get('/withdraw', requireAuth, (req, res) => {
-    res.render('withdraw');
+    res.render('withdraw', { activePage: 'withdraw' });
 });
 
-// History Page
+app.get('/add-stock', requireAuth, (req, res) => {
+    res.render('add_stock', { activePage: 'add' });
+});
+
 app.get('/history', requireAuth, (req, res) => {
-    res.render('history');
+    res.render('history', { activePage: 'history' });
 });
-
 
 // ==========================================
 // ROUTES - ADMIN VIEWS
@@ -493,7 +494,7 @@ app.post('/api/stock/withdraw', requireAuth, (req, res) => {
 // ==========================================
 app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
     const { category, expired_batches } = req.body;
-    
+
     if (!expired_batches || !Array.isArray(expired_batches) || expired_batches.length === 0) {
         return res.status(400).json({ error: "ไม่มีรายการสินค้าที่เลือก (No items selected)" });
     }
@@ -506,7 +507,7 @@ app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
             INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) 
             VALUES ('EXPIRED', ?, ?, ?, ?, ?)
         `);
-        
+
         const timestamp = getBangkokTimestamp();
         let errorOccurred = false;
 
@@ -515,7 +516,7 @@ app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
             stmtDelete.run([batch.stock_id], (err) => {
                 if (err) errorOccurred = true;
             });
-            
+
             // Log format requirement: "หมดวันไหน กี่จำนวน"
             const extraInfo = `${batch.product_name} | หมดอายุ: ${batch.expiry_date}`;
             stmtLog.run([batch.product_id, batch.quantity, req.session.user.username, timestamp, extraInfo], (err) => {
