@@ -41,48 +41,101 @@
                 <div id="tab-stats" class="tab-panel">
 
                     <!-- Summary Stat Cards -->
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">สินค้าในคลัง
-                            </p>
-                            <p id="statTotalProducts" class="text-3xl font-bold text-slate-800">—</p>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                สินค้าในคลัง</p>
+                            <p id="statTotalProducts" class="text-2xl font-bold text-slate-800">—</p>
                         </div>
-                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">
-                                จำนวนสต็อกทั้งหมด</p>
-                            <p id="statTotalStock" class="text-3xl font-bold text-emerald-600">—</p>
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                จำนวนสต็อกรวม</p>
+                            <p id="statTotalStock" class="text-2xl font-bold text-emerald-600">—</p>
                         </div>
-                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">
-                                รายการเบิก-รับทั้งหมด</p>
-                            <p id="statTotalTx" class="text-3xl font-bold text-blue-600">—</p>
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">มูลค่ารวม
+                                (บาท)</p>
+                            <p id="statTotalValue" class="text-2xl font-bold text-indigo-600">—</p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                รายการนำเข้าซ้ำ</p>
+                            <p id="statTotalReceive" class="text-2xl font-bold text-blue-600">—</p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                รายการเบิกออก</p>
+                            <p id="statTotalWithdraw" class="text-2xl font-bold text-rose-600">—</p>
                         </div>
                     </div>
 
 
-                    <!-- Admin/User Management Activity -->
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-slate-100">
-                            <h2 class="text-base font-semibold text-slate-800">ประวัติการจัดการระบบ (10 รายการล่าสุด)
-                            </h2>
+                    <!-- Dual Tables -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <!-- Left: Low Stock -->
+                        <div
+                            class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            <div
+                                class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-rose-50/30">
+                                <h2 class="text-base font-semibold text-rose-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                                        </path>
+                                    </svg>
+                                    สินค้าที่เหลือน้อย (< 50 ชิ้น) </h2>
+                            </div>
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left text-sm">
+                                    <thead>
+                                        <tr
+                                            class="bg-slate-50 text-[11px] text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
+                                            <th class="px-5 py-3">รหัส</th>
+                                            <th class="px-5 py-3">ชื่อสินค้า</th>
+                                            <th class="px-5 py-3 text-right">จำนวนคงเหลือ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbLowStock" class="divide-y divide-slate-100">
+                                        <tr>
+                                            <td colspan="3" class="px-5 py-6 text-center text-slate-400">กำลังโหลด...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm">
-                                <thead>
-                                    <tr
-                                        class="bg-slate-50 text-xs text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
-                                        <th class="px-6 py-3">วัน-เวลา</th>
-                                        <th class="px-6 py-3">ประเภท</th>
-                                        <th class="px-6 py-3">รายละเอียด</th>
-                                        <th class="px-6 py-3">ผู้ดำเนินการ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recentActivity" class="divide-y divide-slate-100">
-                                    <tr>
-                                        <td colspan="4" class="px-6 py-6 text-center text-slate-400">กำลังโหลด...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+
+                        <!-- Right: Frequent Access -->
+                        <div
+                            class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="px-5 py-3 border-b border-slate-100 flex justify-between items-center">
+                                <h2 class="text-base font-semibold text-slate-800">สินค้าที่มีการทำรายการบ่อย</h2>
+                                <div class="flex bg-slate-100 p-1 rounded-lg">
+                                    <button onclick="toggleFreqTab('receive')" id="btnFreqReceive"
+                                        class="px-3 py-1.5 text-xs font-semibold rounded-md bg-white shadow-sm text-blue-700 transition duration-150">นำเข้าบ่อย</button>
+                                    <button onclick="toggleFreqTab('withdraw')" id="btnFreqWithdraw"
+                                        class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-500 hover:text-slate-700 transition duration-150">เบิกออกบ่อย</button>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left text-sm">
+                                    <thead>
+                                        <tr
+                                            class="bg-slate-50 text-[11px] text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
+                                            <th class="px-5 py-3">สินค้า</th>
+                                            <th class="px-5 py-3 text-center">ความถี่ (ครั้ง)</th>
+                                            <th class="px-5 py-3 text-right">จำนวนรวม</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbFrequent" class="divide-y divide-slate-100">
+                                        <tr>
+                                            <td colspan="3" class="px-5 py-6 text-center text-slate-400">กำลังโหลด...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
@@ -142,9 +195,41 @@
                 </div>
 
                 <!-- Tab: User Management -->
-                <div id="tab-users" class="tab-panel hidden">
+                <div id="tab-users" class="tab-panel hidden space-y-8">
 
-                    <div class="flex justify-between items-center mb-4">
+                    <!-- Admin/User Management Activity -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50">
+                            <h2 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                ประวัติการจัดการระบบบัญชีผู้ใช้ (10 รายการล่าสุด)
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead>
+                                    <tr
+                                        class="bg-white text-xs text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-100">
+                                        <th class="px-6 py-3">วัน-เวลา</th>
+                                        <th class="px-6 py-3">ประเภท</th>
+                                        <th class="px-6 py-3">รายละเอียด</th>
+                                        <th class="px-6 py-3">ผู้ดำเนินการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentActivity" class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td colspan="4" class="px-6 py-6 text-center text-slate-400">กำลังโหลด...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col space-y-4">
                         <h2 class="text-base font-semibold text-slate-800">รายชื่อบัญชีผู้ใช้งาน</h2>
                         <button id="btnCreateUser"
                             class="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm transition-all focus:outline-none">
@@ -375,22 +460,43 @@
                     });
                 });
 
-                // --- Load Stats ---
+                let statsData = null;
+                let currentFreqTab = 'receive';
+
                 async function loadStats() {
                     try {
                         const [statsRes, historyRes] = await Promise.all([
                             fetch('/api/admin/dashboard-stats'),
                             fetch('/api/history')
                         ]);
-                        const stats = await statsRes.json();
+                        statsData = await statsRes.json();
                         const history = await historyRes.json();
 
-                        // Summary cards
-                        document.getElementById('statTotalProducts').textContent = (stats.totalProducts ?? '—').toLocaleString();
-                        document.getElementById('statTotalStock').textContent = (stats.totalStock ?? '—').toLocaleString();
-                        document.getElementById('statTotalTx').textContent = (stats.totalTx ?? '—').toLocaleString();
+                        // 1. Summary cards
+                        document.getElementById('statTotalProducts').textContent = (statsData.totalProducts ?? '—').toLocaleString();
+                        document.getElementById('statTotalStock').textContent = (statsData.totalStock ?? '—').toLocaleString();
+                        document.getElementById('statTotalValue').textContent = "฿" + (statsData.totalValue ?? '—').toLocaleString(undefined, { minimumFractionDigits: 2 });
+                        document.getElementById('statTotalReceive').textContent = (statsData.totalReceiveTx ?? '—').toLocaleString();
+                        document.getElementById('statTotalWithdraw').textContent = (statsData.totalWithdrawTx ?? '—').toLocaleString();
 
-                        // User/Product management actions only
+                        // 2. Low Stock Table
+                        const tbLow = document.getElementById('tbLowStock');
+                        if (!statsData.lowStockList || statsData.lowStockList.length === 0) {
+                            tbLow.innerHTML = '<tr><td colspan="3" class="px-5 py-6 text-center text-slate-400">ยังไม่มีรายการเตือน</td></tr>';
+                        } else {
+                            tbLow.innerHTML = statsData.lowStockList.map(item => {
+                                return `<tr class="hover:bg-slate-50">
+                                    <td class="px-5 py-3 text-[11px] font-mono text-slate-400">#${item.id}</td>
+                                    <td class="px-5 py-3 font-medium text-slate-700">${item.product_name}</td>
+                                    <td class="px-5 py-3 text-right text-rose-600 font-bold">${item.total_qty}</td>
+                                </tr>`;
+                            }).join('');
+                        }
+
+                        // 3. Render Frequent Table
+                        renderFrequentTable();
+
+                        // 4. User/Product management actions only
                         const mgmtTypes = ['CREATE_USER', 'DELETE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT'];
                         const mgmtLogs = history.filter(l => mgmtTypes.includes(l.action_type)).slice(0, 10);
 
@@ -431,6 +537,49 @@
                         }
 
                     } catch (e) { console.error(e); }
+                }
+
+                window.toggleFreqTab = function (tab) {
+                    currentFreqTab = tab;
+
+                    // Update buttons
+                    const btnR = document.getElementById('btnFreqReceive');
+                    const btnW = document.getElementById('btnFreqWithdraw');
+
+                    if (tab === 'receive') {
+                        btnR.className = "px-3 py-1.5 text-xs font-semibold rounded-md bg-white shadow-sm text-blue-700 transition duration-150";
+                        btnW.className = "px-3 py-1.5 text-xs font-medium rounded-md text-slate-500 hover:text-slate-700 transition duration-150";
+                    } else {
+                        btnW.className = "px-3 py-1.5 text-xs font-semibold rounded-md bg-white shadow-sm text-rose-700 transition duration-150";
+                        btnR.className = "px-3 py-1.5 text-xs font-medium rounded-md text-slate-500 hover:text-slate-700 transition duration-150";
+                    }
+
+                    renderFrequentTable();
+                }
+
+                function renderFrequentTable() {
+                    const tbFreq = document.getElementById('tbFrequent');
+                    if (!statsData) return;
+
+                    const list = currentFreqTab === 'receive' ? statsData.frequentReceiveList : statsData.frequentWithdrawList;
+                    const colorScore = currentFreqTab === 'receive' ? 'text-blue-600' : 'text-rose-600';
+
+                    if (!list || list.length === 0) {
+                        tbFreq.innerHTML = '<tr><td colspan="3" class="px-5 py-6 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>';
+                    } else {
+                        tbFreq.innerHTML = list.map(item => {
+                            return `<tr class="hover:bg-slate-50">
+                                <td class="px-5 py-3">
+                                    <div class="flex items-center gap-2 font-medium text-slate-800">
+                                        ${item.product_name}
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 font-mono mt-0.5">#${item.id}</div>
+                                </td>
+                                <td class="px-5 py-3 text-center font-bold ${colorScore}">${item.freq}</td>
+                                <td class="px-5 py-3 text-right text-slate-600 font-mono font-bold">${item.total_qty}</td>
+                            </tr>`;
+                        }).join('');
+                    }
                 }
 
 

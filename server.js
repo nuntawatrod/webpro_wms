@@ -556,34 +556,61 @@ app.get('/api/history', requireAuth, (req, res) => {
 app.get('/api/admin/dashboard-stats', requireAdmin, (req, res) => {
     const stats = {};
 
-    // Summary totals
-    db.get(`SELECT COUNT(*) as totalProducts FROM Products`, (err, row1) => {
-        stats.totalProducts = row1?.totalProducts || 0;
+    db.serialize(() => {
+        // 1. Total Products
+        db.get(`SELECT COUNT(*) as totalProducts FROM Products`, (err, row1) => {
+            stats.totalProducts = row1?.totalProducts || 0;
 
-        db.get(`SELECT SUM(quantity) as totalStock FROM Stock WHERE quantity > 0`, (err, row2) => {
-            stats.totalStock = row2?.totalStock || 0;
+            // 2. Total Stock & Value
+            db.get(`
+                SELECT SUM(s.quantity) as totalStock, SUM(s.quantity * p.price) as totalValue 
+                FROM Stock s JOIN Products p ON s.product_id = p.id 
+                WHERE s.quantity > 0
+            `, (err, row2) => {
+                stats.totalStock = row2?.totalStock || 0;
+                stats.totalValue = row2?.totalValue || 0;
 
-            db.get(`SELECT COUNT(*) as totalTx FROM Transactions_Log`, (err, row3) => {
-                stats.totalTx = row3?.totalTx || 0;
+                // 3. Transactions Info
+                db.get(`
+                    SELECT 
+                        SUM(CASE WHEN action_type = 'ADD' THEN 1 ELSE 0 END) as totalReceiveTx,
+                        SUM(CASE WHEN action_type = 'WITHDRAW' THEN 1 ELSE 0 END) as totalWithdrawTx
+                    FROM Transactions_Log
+                `, (err, row3) => {
+                    stats.totalReceiveTx = row3?.totalReceiveTx || 0;
+                    stats.totalWithdrawTx = row3?.totalWithdrawTx || 0;
 
-                // Top 5 Sellers
-                db.all(`
-                    SELECT p.product_name, SUM(t.quantity) as total_sold
-                    FROM Transactions_Log t JOIN Products p ON t.product_id = p.id
-                    WHERE t.action_type = 'WITHDRAW'
-                    GROUP BY t.product_id ORDER BY total_sold DESC LIMIT 5
-                `, [], (err, top) => {
-                    stats.top5 = top || [];
-
-                    // Worst 5 Sellers
+                    // 4. Low Stock List (< 50)
                     db.all(`
-                        SELECT p.product_name, SUM(t.quantity) as total_sold
-                        FROM Transactions_Log t JOIN Products p ON t.product_id = p.id
-                        WHERE t.action_type = 'WITHDRAW'
-                        GROUP BY t.product_id ORDER BY total_sold ASC LIMIT 5
-                    `, [], (err, worst) => {
-                        stats.worst5 = worst || [];
-                        res.json(stats);
+                        SELECT p.id, p.product_name, COALESCE(SUM(s.quantity), 0) as total_qty 
+                        FROM Products p 
+                        LEFT JOIN Stock s ON p.id = s.product_id 
+                        GROUP BY p.id 
+                        HAVING total_qty < 50 AND total_qty > 0 
+                        ORDER BY total_qty ASC LIMIT 10
+                    `, [], (err, lowStock) => {
+                        stats.lowStockList = lowStock || [];
+
+                        // 5. Frequent Receive List
+                        db.all(`
+                            SELECT p.id, p.product_name, COUNT(t.id) as freq, SUM(t.quantity) as total_qty 
+                            FROM Transactions_Log t JOIN Products p ON t.product_id = p.id 
+                            WHERE t.action_type = 'ADD' 
+                            GROUP BY p.id ORDER BY freq DESC LIMIT 10
+                        `, [], (err, freqAdd) => {
+                            stats.frequentReceiveList = freqAdd || [];
+
+                            // 6. Frequent Withdraw List
+                            db.all(`
+                                SELECT p.id, p.product_name, COUNT(t.id) as freq, SUM(t.quantity) as total_qty 
+                                FROM Transactions_Log t JOIN Products p ON t.product_id = p.id 
+                                WHERE t.action_type = 'WITHDRAW' 
+                                GROUP BY p.id ORDER BY freq DESC LIMIT 10
+                            `, [], (err, freqWithdraw) => {
+                                stats.frequentWithdrawList = freqWithdraw || [];
+                                res.json(stats);
+                            });
+                        });
                     });
                 });
             });
