@@ -253,10 +253,10 @@ function initDashboard() {
     let currentView = 'grid'; // default
     let currentSearch = '';
     let currentCategory = 'all';
-    let currentSort = 'name-asc';
+    let currentSort = 'qty-asc';
     let currentPage = 1;
     let showExpiredMode = false;
-    const PAGE_SIZE = 100;
+    const PAGE_SIZE = 40;
 
     const gridView = document.getElementById('gridView');
     const tableView = document.getElementById('tableView');
@@ -418,8 +418,12 @@ function initDashboard() {
 
         // Sort
         const sortedData = [...filtered].sort((a, b) => {
-            if (currentSort === 'name-desc') {
-                return b.product_name.localeCompare(a.product_name, 'th');
+            if (currentSort === 'qty-desc') {
+                const qtyA = showExpiredMode ? (a.expired_quantity || 0) : a.total_quantity;
+                const qtyB = showExpiredMode ? (b.expired_quantity || 0) : b.total_quantity;
+                // Fallback to name if quantity is equal
+                if (qtyA === qtyB) return a.product_name.localeCompare(b.product_name, 'th');
+                return qtyB - qtyA;
             } else if (currentSort === 'expiry-asc') {
                 const getNearest = (p) => {
                     let min = null;
@@ -435,12 +439,16 @@ function initDashboard() {
                 };
                 const da = getNearest(a);
                 const db2 = getNearest(b);
-                if (da === null && db2 === null) return 0;
+                if (da === null && db2 === null) return a.product_name.localeCompare(b.product_name, 'th');
                 if (da === null) return 1;
                 if (db2 === null) return -1;
+                if (da === db2) return a.product_name.localeCompare(b.product_name, 'th');
                 return da - db2;
-            } else {
-                return a.product_name.localeCompare(b.product_name, 'th');
+            } else { // qty-asc as default
+                const qtyA = showExpiredMode ? (a.expired_quantity || 0) : a.total_quantity;
+                const qtyB = showExpiredMode ? (b.expired_quantity || 0) : b.total_quantity;
+                if (qtyA === qtyB) return a.product_name.localeCompare(b.product_name, 'th');
+                return qtyA - qtyB;
             }
         });
 
