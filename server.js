@@ -78,7 +78,9 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            role TEXT DEFAULT 'staff'
+            full_name TEXT,
+            role TEXT DEFAULT 'staff',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`);
 
         // Products Table (Added shelf_life_days)
@@ -139,6 +141,22 @@ function initializeDatabase() {
                 db.run("ALTER TABLE Transactions_Log ADD COLUMN extra_info TEXT", (alterErr) => {
                     if (alterErr) console.error("Migration extra_info failed:", alterErr);
                     else console.log("Migration: Added extra_info column to Transactions_Log.");
+                });
+            }
+        });
+
+        // Migration: add full_name and created_at to Users if missing
+        db.all("PRAGMA table_info(Users)", (err, cols) => {
+            if (!err && cols && !cols.find(c => c.name === 'full_name')) {
+                db.run("ALTER TABLE Users ADD COLUMN full_name TEXT", (alterErr) => {
+                    if (alterErr) console.error("Migration full_name failed:", alterErr);
+                    else console.log("Migration: Added full_name column to Users.");
+                });
+            }
+            if (!err && cols && !cols.find(c => c.name === 'created_at')) {
+                db.run("ALTER TABLE Users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP", (alterErr) => {
+                    if (alterErr) console.error("Migration created_at failed:", alterErr);
+                    else console.log("Migration: Added created_at column to Users.");
                 });
             }
         });
@@ -713,21 +731,21 @@ app.post('/api/admin/reseed-stock', requireManager, (req, res) => {
 });
 
 app.get('/api/admin/users', requireManager, (req, res) => {
-    db.all("SELECT id, username, role FROM Users", [], (err, rows) => {
+    db.all("SELECT id, username, full_name, role, created_at FROM Users", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
 app.post('/api/admin/users', requireManager, (req, res) => {
-    const { username, password, role } = req.body;
-    if (!username || !password) return res.status(400).json({ error: "ใส่ข้อมูลให้ครบ (Missing fields)" });
+    const { username, password, full_name, role } = req.body;
+    if (!username || !password || !full_name) return res.status(400).json({ error: "ใส่ข้อมูลให้ครบ (Missing fields)" });
 
     const uRole = role === 'manager' ? 'manager' : 'staff';
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
 
-    db.run("INSERT INTO Users (username, password, role) VALUES (?, ?, ?)", [username, hash, uRole], function (err) {
+    db.run("INSERT INTO Users (username, password, full_name, role) VALUES (?, ?, ?, ?)", [username, hash, full_name, uRole], function (err) {
         if (err) return res.status(500).json({ error: "ชื่อผู้ใช้นี้มีอยู่แล้ว หรือเกิดข้อผิดพลาด (Username exists or DB error)" });
         const newUserId = this.lastID;
         db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) VALUES ('CREATE_USER', NULL, NULL, ?, ?, ?)`,
