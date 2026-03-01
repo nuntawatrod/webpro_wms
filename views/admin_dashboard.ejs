@@ -59,35 +59,12 @@
                         </div>
                     </div>
 
-                    <!-- Charts Row -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                        <!-- Top 5 Sellers Chart -->
-                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 class="text-base font-semibold text-slate-800 mb-4">5 อันดับสินค้าขายดีสุด</h2>
-                            <div class="relative h-64">
-                                <canvas id="chartTop5"></canvas>
-                                <p id="chartTop5Empty"
-                                    class="hidden absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
-                                    ยังไม่มีข้อมูลการเบิกสินค้า</p>
-                            </div>
-                        </div>
 
-                        <!-- Worst 5 Sellers Chart -->
-                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 class="text-base font-semibold text-slate-800 mb-4">5 อันดับสินค้าขายช้าสุด</h2>
-                            <div class="relative h-64">
-                                <canvas id="chartWorst5"></canvas>
-                                <p id="chartWorst5Empty"
-                                    class="hidden absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
-                                    ยังไม่มีข้อมูลการเบิกสินค้า</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Recent Activity -->
+                    <!-- Admin/User Management Activity -->
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="px-6 py-4 border-b border-slate-100">
-                            <h2 class="text-base font-semibold text-slate-800">ประวัติล่าสุด (10 รายการ)</h2>
+                            <h2 class="text-base font-semibold text-slate-800">ประวัติการจัดการระบบ (10 รายการล่าสุด)
+                            </h2>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
@@ -96,14 +73,13 @@
                                         class="bg-slate-50 text-xs text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
                                         <th class="px-6 py-3">วัน-เวลา</th>
                                         <th class="px-6 py-3">ประเภท</th>
-                                        <th class="px-6 py-3">สินค้า</th>
-                                        <th class="px-6 py-3 text-right">จำนวน</th>
-                                        <th class="px-6 py-3">ผู้ทำรายการ</th>
+                                        <th class="px-6 py-3">รายละเอียด</th>
+                                        <th class="px-6 py-3">ผู้ดำเนินการ</th>
                                     </tr>
                                 </thead>
                                 <tbody id="recentActivity" class="divide-y divide-slate-100">
                                     <tr>
-                                        <td colspan="5" class="px-6 py-6 text-center text-slate-400">กำลังโหลด...</td>
+                                        <td colspan="4" class="px-6 py-6 text-center text-slate-400">กำลังโหลด...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -399,7 +375,7 @@
                     });
                 });
 
-                // --- Load Stats & Charts ---
+                // --- Load Stats ---
                 async function loadStats() {
                     try {
                         const [statsRes, historyRes] = await Promise.all([
@@ -414,62 +390,43 @@
                         document.getElementById('statTotalStock').textContent = (stats.totalStock ?? '—').toLocaleString();
                         document.getElementById('statTotalTx').textContent = (stats.totalTx ?? '—').toLocaleString();
 
-                        // Charts
-                        function makeChart(canvasId, emptyId, labels, values, color) {
-                            if (!values.length) {
-                                document.getElementById(emptyId).classList.remove('hidden');
-                                document.getElementById(canvasId).classList.add('hidden');
-                                return;
-                            }
-                            new Chart(document.getElementById(canvasId), {
-                                type: 'bar',
-                                data: {
-                                    labels,
-                                    datasets: [{ data: values, backgroundColor: color, borderRadius: 6, barThickness: 28 }]
-                                },
-                                options: {
-                                    responsive: true, maintainAspectRatio: false,
-                                    plugins: { legend: { display: false } },
-                                    scales: {
-                                        x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 30 } },
-                                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 } } }
-                                    }
-                                }
-                            });
-                        }
+                        // User/Product management actions only
+                        const mgmtTypes = ['CREATE_USER', 'DELETE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT'];
+                        const mgmtLogs = history.filter(l => mgmtTypes.includes(l.action_type)).slice(0, 10);
 
-                        makeChart('chartTop5', 'chartTop5Empty',
-                            stats.top5.map(i => i.product_name.substring(0, 12) + (i.product_name.length > 12 ? '…' : '')),
-                            stats.top5.map(i => i.total_sold),
-                            'rgba(16, 185, 129, 0.7)'
-                        );
-
-                        makeChart('chartWorst5', 'chartWorst5Empty',
-                            stats.worst5.map(i => i.product_name.substring(0, 12) + (i.product_name.length > 12 ? '…' : '')),
-                            stats.worst5.map(i => i.total_sold),
-                            'rgba(239, 68, 68, 0.7)'
-                        );
-
-                        // Recent Activity
                         const tbody = document.getElementById('recentActivity');
-                        const recent = history.slice(0, 10);
-                        if (recent.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-6 text-center text-slate-400">ยังไม่มีรายการ</td></tr>';
+                        if (mgmtLogs.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-slate-400">ยังไม่มีรายการจัดการระบบ</td></tr>';
                         } else {
-                            tbody.innerHTML = recent.map(log => {
-                                const isAdd = log.action_type === 'ADD';
-                                const d = new Date(log.action_date);
-                                const dt = d.toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-                                const badge = isAdd
-                                    ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">รับเข้า</span>'
-                                    : '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">เบิกออก</span>';
+                            tbody.innerHTML = mgmtLogs.map(log => {
+                                const rawDate = (log.action_date || '');
+                                const d = new Date(rawDate.replace(' ', 'T') + '+07:00');
+                                const dt = isNaN(d.getTime()) ? rawDate : d.toLocaleString('th-TH', {
+                                    day: '2-digit', month: 'short',
+                                    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok'
+                                });
+
+                                let badge = '';
+                                let detail = log.extra_info || log.product_name || '-';
+
+                                if (log.action_type === 'CREATE_USER') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">สร้างผู้ใช้</span>';
+                                } else if (log.action_type === 'DELETE_USER') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">ลบผู้ใช้</span>';
+                                } else if (log.action_type === 'CREATE_PRODUCT') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">เพิ่มสินค้า</span>';
+                                    detail = log.extra_info || log.product_name || '-';
+                                } else if (log.action_type === 'DELETE_PRODUCT') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">ลบสินค้า</span>';
+                                    detail = log.extra_info || log.product_name || '-';
+                                }
+
                                 return `<tr class="hover:bg-slate-50">
-                            <td class="px-6 py-3 text-slate-400 text-xs whitespace-nowrap">${dt}</td>
-                            <td class="px-6 py-3">${badge}</td>
-                            <td class="px-6 py-3 text-slate-800 font-medium">${log.product_name}</td>
-                            <td class="px-6 py-3 text-right font-mono font-bold ${isAdd ? 'text-emerald-600' : 'text-rose-600'}">${isAdd ? '+' : '-'}${log.quantity}</td>
-                            <td class="px-6 py-3 text-slate-500">${log.actor_name}</td>
-                        </tr>`;
+                                    <td class="px-6 py-3 text-slate-400 text-xs whitespace-nowrap">${dt}</td>
+                                    <td class="px-6 py-3">${badge}</td>
+                                    <td class="px-6 py-3 text-slate-800 font-medium">${detail}</td>
+                                    <td class="px-6 py-3 text-slate-500">${log.actor_name || '-'}</td>
+                                </tr>`;
                             }).join('');
                         }
 
