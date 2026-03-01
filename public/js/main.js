@@ -27,19 +27,31 @@ function showToast(message, type = 'success') {
     }, 4000);
 }
 
-function getDaysRemaining(expiryDateStr) {
-    if (!expiryDateStr) return null;
+let BKK_TODAY_DATE = null;
 
-    // Get current date exactly in Asia/Bangkok
+function updateBkkTodayDate() {
     const bkkTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
     const todayStr = bkkTime.getFullYear() + '-' + String(bkkTime.getMonth() + 1).padStart(2, '0') + '-' + String(bkkTime.getDate()).padStart(2, '0');
+    BKK_TODAY_DATE = new Date(todayStr + "T00:00:00Z");
+}
+updateBkkTodayDate(); // Initialize once on script load
 
-    // Map strictly to UTC midnights for accurate day math
-    const today = new Date(todayStr + "T00:00:00Z");
+function getDaysRemaining(expiryDateStr) {
+    if (!expiryDateStr) return null;
+    if (!BKK_TODAY_DATE) updateBkkTodayDate();
+
+    // Fast string mapping rather than deep timezone processing
     const expiry = new Date(expiryDateStr + "T00:00:00Z");
-
-    const diffTime = expiry - today;
+    const diffTime = expiry - BKK_TODAY_DATE;
     return Math.round(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
 }
 
 function formatDate(dateStr) {
@@ -158,7 +170,7 @@ function showLotDetailsModal(productId, inventoryData, showExpiredMode) {
     subtitleEl.textContent = `หมวดหมู่: ${product.category_name || 'ทั่วไป'}`;
 
     const filteredBatches = product.batches.filter(b => {
-        const d = getDaysRemaining(b.expiry_date);
+        const d = b.daysRemaining;
         if (d === null) return !showExpiredMode;
         if (showExpiredMode) return d < 0;
         return d >= 0;
@@ -171,7 +183,7 @@ function showLotDetailsModal(productId, inventoryData, showExpiredMode) {
 
         let html = '';
         sortedBatches.forEach(b => {
-            const daysRemaining = getDaysRemaining(b.expiry_date);
+            const daysRemaining = b.daysRemaining;
             let daysText = '-';
             let rowClass = 'bg-white border-slate-200';
             let textClass = 'text-slate-600';
@@ -273,6 +285,16 @@ function initDashboard() {
 
     fetchInventory();
 
+    function precalculateExpiries() {
+        if (!inventoryData) return;
+        updateBkkTodayDate();
+        inventoryData.forEach(p => {
+            p.batches.forEach(b => {
+                b.daysRemaining = getDaysRemaining(b.expiry_date);
+            });
+        });
+    }
+
     async function fetchInventory() {
         loadingIndicator.classList.remove('hidden');
         gridView.classList.add('hidden');
@@ -283,6 +305,7 @@ function initDashboard() {
             const res = await fetch(`${API_BASE}/inventory`);
             if (!res.ok) throw new Error('Failed to load inventory');
             inventoryData = await res.json();
+            precalculateExpiries();
             buildCategoryTabs();
             updateExpiryBanner();
             renderData();
@@ -300,6 +323,7 @@ function initDashboard() {
             const res = await fetch(`${API_BASE}/inventory`);
             if (res.ok) {
                 inventoryData = await res.json();
+                precalculateExpiries();
                 updateExpiryBanner();
                 renderData();
             }
@@ -315,7 +339,7 @@ function initDashboard() {
         if (!banner || !bannerText) return;
         const expiredToday = inventoryData.filter(p =>
             p.batches.some(b => {
-                const d = getDaysRemaining(b.expiry_date);
+                const d = b.daysRemaining;
                 return d !== null && d <= 0;
             })
         );
@@ -377,11 +401,11 @@ function initDashboard() {
             if (!matchCat || !matchSearch) return false;
 
             const hasExpired = p.batches.some(b => {
-                const d = getDaysRemaining(b.expiry_date);
+                const d = b.daysRemaining;
                 return d !== null && d < 0;
             });
             const hasNormal = p.batches.some(b => {
-                const d = getDaysRemaining(b.expiry_date);
+                const d = b.daysRemaining;
                 return d !== null && d >= 0;
             });
 
@@ -400,7 +424,7 @@ function initDashboard() {
                 const getNearest = (p) => {
                     let min = null;
                     p.batches.forEach(batch => {
-                        const d = getDaysRemaining(batch.expiry_date);
+                        const d = batch.daysRemaining;
                         if (d !== null) {
                             if (showExpiredMode && d >= 0) return;
                             if (!showExpiredMode && d < 0) return;
@@ -454,7 +478,7 @@ function initDashboard() {
             if (showExpiredMode) {
                 sortedData.forEach(p => {
                     p.batches.forEach(b => {
-                        const d = getDaysRemaining(b.expiry_date);
+                        const d = b.daysRemaining;
                         if (d !== null && d < 0) expiredBatchesCount++;
                     });
                 });
@@ -473,7 +497,7 @@ function initDashboard() {
                         const batchesToDelete = [];
                         sortedData.forEach(p => {
                             p.batches.forEach(b => {
-                                const d = getDaysRemaining(b.expiry_date);
+                                const d = b.daysRemaining;
                                 if (d !== null && d < 0) {
                                     batchesToDelete.push({
                                         stock_id: b.stock_id,
@@ -539,7 +563,7 @@ function initDashboard() {
 
             product.batches.forEach(b => {
                 if (b.expiry_date) {
-                    const days = getDaysRemaining(b.expiry_date);
+                    const days = b.daysRemaining;
                     if (days !== null) {
                         if (showExpiredMode && days >= 0) return;
                         if (!showExpiredMode && days < 0) return;
@@ -596,7 +620,7 @@ function initDashboard() {
             if (isExpired && showExpiredMode) {
                 // Determine the specific expired batches for this product to delete
                 const expiredBatchesStr = JSON.stringify(product.batches.filter(b => {
-                    const d = getDaysRemaining(b.expiry_date);
+                    const d = b.daysRemaining;
                     return d !== null && d < 0;
                 }).map(b => ({
                     stock_id: b.stock_id,
@@ -705,7 +729,7 @@ function initDashboard() {
             const nearestDay = (() => {
                 let min = null;
                 product.batches.forEach(b => {
-                    const d = getDaysRemaining(b.expiry_date);
+                    const d = b.daysRemaining;
                     if (d !== null) {
                         if (showExpiredMode && d >= 0) return;
                         if (!showExpiredMode && d < 0) return;
@@ -735,7 +759,7 @@ function initDashboard() {
             let actionBtnHtml = '';
             if (isExpiredProduct && showExpiredMode) {
                 const expiredBatchesStr = JSON.stringify(product.batches.filter(b => {
-                    const d = getDaysRemaining(b.expiry_date);
+                    const d = b.daysRemaining;
                     return d !== null && d < 0;
                 }).map(b => ({
                     stock_id: b.stock_id,
@@ -776,7 +800,7 @@ function initDashboard() {
 
             if (product.batches.length > 0) {
                 const filteredBatches = product.batches.filter(b => {
-                    const d = getDaysRemaining(b.expiry_date);
+                    const d = b.daysRemaining;
                     if (d === null) return !showExpiredMode;
                     if (showExpiredMode) return d < 0;
                     return d >= 0;
@@ -801,7 +825,7 @@ function initDashboard() {
                                 <tbody class="divide-y divide-slate-100">`;
 
                     sortedBatches.forEach(b => {
-                        const daysRemaining = getDaysRemaining(b.expiry_date);
+                        const daysRemaining = b.daysRemaining;
                         let daysText = '-';
                         let rowClass = '';
 
@@ -911,14 +935,14 @@ function initDashboard() {
         });
     }
 
-    // Search box
+    // Search box with debounce for performance
     const searchBox = document.getElementById('productSearchBox');
     if (searchBox) {
-        searchBox.addEventListener('input', (e) => {
+        searchBox.addEventListener('input', debounce((e) => {
             currentSearch = e.target.value.toLowerCase().trim();
             currentPage = 1;
             renderData();
-        });
+        }, 250));
     }
 
     // --- Add Stock Logic moved to initAddStockPage() ---
