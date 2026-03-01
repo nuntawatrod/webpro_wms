@@ -255,11 +255,11 @@ function initDashboard() {
             showExpiredMode = !showExpiredMode;
             currentPage = 1;
             if (showExpiredMode) {
-                btnToggleExpired.className = 'border border-rose-400 text-rose-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-rose-50 shadow-sm transition-all flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-400';
-                btnToggleExpired.innerHTML = `<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>กลับสินค้าปกติ`;
+                btnToggleExpired.className = 'bg-slate-800 hover:bg-slate-900 text-white w-44 justify-center py-2.5 rounded-xl text-sm font-bold shadow-md shadow-slate-800/20 transition-all flex items-center shrink-0 ml-1 sm:ml-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500';
+                btnToggleExpired.innerHTML = `<svg class="w-5 h-5 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>กลับสินค้าปกติ`;
             } else {
-                btnToggleExpired.className = 'border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-100 shadow-sm transition-all flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400';
-                btnToggleExpired.innerHTML = `<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>ดูสินค้าหมดอายุ`;
+                btnToggleExpired.className = 'bg-rose-600 hover:bg-rose-700 text-white w-44 justify-center py-2.5 rounded-xl text-sm font-bold shadow-md shadow-rose-600/20 transition-all flex items-center shrink-0 ml-1 sm:ml-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500';
+                btnToggleExpired.innerHTML = `<svg class="w-5 h-5 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>ดูสินค้าหมดอายุ`;
             }
             renderData();
         });
@@ -425,17 +425,82 @@ function initDashboard() {
             gridView.classList.add('hidden');
             tableView.classList.add('hidden');
             emptyState.classList.remove('hidden');
-            return;
+        } else {
+            emptyState.classList.add('hidden');
+            if (currentView === 'grid') {
+                renderGrid(pageData);
+                gridView.classList.remove('hidden');
+                tableView.classList.add('hidden');
+            } else {
+                renderTable(pageData);
+                tableView.classList.remove('hidden');
+                gridView.classList.add('hidden');
+            }
         }
 
-        if (currentView === 'grid') {
-            renderGrid(pageData);
-            gridView.classList.remove('hidden');
-            tableView.classList.add('hidden');
-        } else {
-            renderTable(pageData);
-            tableView.classList.remove('hidden');
-            gridView.classList.add('hidden');
+        // --- Handle Delete Expired Button ---
+        const deleteContainer = document.getElementById('deleteExpiredContainer');
+        const btnDelete = document.getElementById('btnDeleteExpired');
+        const btnDeleteText = document.getElementById('btnDeleteExpiredText');
+
+        if (deleteContainer && btnDelete && btnDeleteText) {
+            let expiredBatchesCount = 0;
+            if (showExpiredMode) {
+                sortedData.forEach(p => {
+                    p.batches.forEach(b => {
+                        const d = getDaysRemaining(b.expiry_date);
+                        if (d !== null && d < 0) expiredBatchesCount++;
+                    });
+                });
+            }
+
+            if (showExpiredMode && expiredBatchesCount > 0) {
+                deleteContainer.classList.remove('hidden');
+                btnDeleteText.textContent = `ลบสินค้าหมดอายุ${currentCategory !== 'all' ? 'ในหมวดนี้' : 'ทั้งหมด'} (${expiredBatchesCount})`;
+
+                const newBtnDelete = btnDelete.cloneNode(true);
+                btnDelete.parentNode.replaceChild(newBtnDelete, btnDelete);
+
+                newBtnDelete.addEventListener('click', () => {
+                    const confirmMessage = `คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`;
+                    showDeleteConfirmModal(confirmMessage, async () => {
+                        const batchesToDelete = [];
+                        sortedData.forEach(p => {
+                            p.batches.forEach(b => {
+                                const d = getDaysRemaining(b.expiry_date);
+                                if (d !== null && d < 0) {
+                                    batchesToDelete.push({
+                                        stock_id: b.stock_id,
+                                        product_id: p.id,
+                                        product_name: p.product_name,
+                                        quantity: b.quantity,
+                                        expiry_date: b.expiry_date
+                                    });
+                                }
+                            });
+                        });
+
+                        try {
+                            const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                            });
+                            const result = await res.json();
+                            if (res.ok) {
+                                showToast(result.message || 'ลบสำเร็จ', 'success');
+                                reloadInventorySilently();
+                            } else {
+                                alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                            }
+                        } catch (err) {
+                            alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                        }
+                    });
+                });
+            } else {
+                deleteContainer.classList.add('hidden');
+            }
         }
     }
 
@@ -461,75 +526,6 @@ function initDashboard() {
 
     function renderGrid(data) {
         gridView.innerHTML = '';
-
-        // Expired mode header
-        if (showExpiredMode) {
-            const header = document.createElement('div');
-            header.className = 'col-span-full mb-4 px-4 py-3 bg-slate-100 border border-slate-300 rounded-xl flex items-center justify-between shadow-sm';
-
-            // Calculate how many total expired batches there are in the current filtered data
-            let expiredBatchesCount = 0;
-            data.forEach(p => {
-                p.batches.forEach(b => {
-                    const d = getDaysRemaining(b.expiry_date);
-                    if (d !== null && d < 0) expiredBatchesCount++;
-                });
-            });
-
-            header.innerHTML = `
-                <div class="text-slate-600 font-medium flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    แสดงสินค้าที่หมดอายุแล้วทั้งหมด ${data.length} รายการ (${expiredBatchesCount} ล็อต)
-                </div>
-                <button id="btnDeleteAllExpired" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm shadow-rose-600/20 transition-all flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    ลบสินค้าหมดอายุ${currentCategory !== 'all' ? 'ในหมวดนี้' : 'ทั้งหมด'}
-                </button>
-            `;
-            gridView.appendChild(header);
-
-            const btnDeleteAll = header.querySelector('#btnDeleteAllExpired');
-            if (btnDeleteAll) {
-                btnDeleteAll.addEventListener('click', () => {
-                    const confirmMessage = `คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`;
-                    showDeleteConfirmModal(confirmMessage, async () => {
-                        const batchesToDelete = [];
-                        data.forEach(p => {
-                            p.batches.forEach(b => {
-                                const d = getDaysRemaining(b.expiry_date);
-                                if (d !== null && d < 0) {
-                                    batchesToDelete.push({
-                                        stock_id: b.stock_id,
-                                        product_id: p.id,
-                                        product_name: p.product_name,
-                                        quantity: b.quantity,
-                                        expiry_date: b.expiry_date
-                                    });
-                                }
-                            });
-                        });
-
-                        try {
-                            const res = await fetch(`${API_BASE}/stock/delete-expired`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
-                            });
-                            const result = await res.json();
-                            if (res.ok) {
-                                showToast(result.message || 'ลบสำเร็จ', 'success');
-                                reloadInventorySilently(); // Reload without UI jump
-                            } else {
-                                alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
-                            }
-                        } catch (err) {
-                            alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                        }
-                    });
-                });
-            }
-        }
-
 
         data.forEach(product => {
             let nearestExpiryDay = null;
@@ -698,79 +694,6 @@ function initDashboard() {
 
     function renderTable(data) {
         tableBody.innerHTML = '';
-
-        // Expired mode header for table view (placed above the table)
-        // Since tableBody is a tbody inside a table, we append a header row or we put a container above the table.
-        // It's easier to put a <tr> header before the data.
-        if (showExpiredMode) {
-            let expiredBatchesCount = 0;
-            data.forEach(p => {
-                p.batches.forEach(b => {
-                    const d = getDaysRemaining(b.expiry_date);
-                    if (d !== null && d < 0) expiredBatchesCount++;
-                });
-            });
-
-            const trHeader = document.createElement('tr');
-            trHeader.className = 'bg-slate-100 border-b border-slate-300 shadow-sm';
-            trHeader.innerHTML = `
-                <td colspan="5" class="px-6 py-4">
-                    <div class="flex items-center justify-between">
-                        <div class="text-slate-600 font-medium flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            แสดงสินค้าที่หมดอายุแล้วทั้งหมด ${data.length} รายการ (${expiredBatchesCount} ล็อต)
-                        </div>
-                        <button id="btnDeleteAllExpiredTable" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm shadow-rose-600/20 transition-all flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500">
-                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                            ลบสินค้าหมดอายุ${currentCategory !== 'all' ? 'ในหมวดนี้' : 'ทั้งหมด'}
-                        </button>
-                    </div>
-                </td>
-            `;
-            tableBody.appendChild(trHeader);
-
-            // Wire up the button
-            const btnDeleteAll = trHeader.querySelector('#btnDeleteAllExpiredTable');
-            if (btnDeleteAll) {
-                btnDeleteAll.addEventListener('click', () => {
-                    const confirmMessage = `คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`;
-                    showDeleteConfirmModal(confirmMessage, async () => {
-                        const batchesToDelete = [];
-                        data.forEach(p => {
-                            p.batches.forEach(b => {
-                                const d = getDaysRemaining(b.expiry_date);
-                                if (d !== null && d < 0) {
-                                    batchesToDelete.push({
-                                        stock_id: b.stock_id,
-                                        product_id: p.id,
-                                        product_name: p.product_name,
-                                        quantity: b.quantity,
-                                        expiry_date: b.expiry_date
-                                    });
-                                }
-                            });
-                        });
-
-                        try {
-                            const res = await fetch(`${API_BASE}/stock/delete-expired`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
-                            });
-                            const result = await res.json();
-                            if (res.ok) {
-                                showToast(result.message || 'ลบสำเร็จ', 'success');
-                                reloadInventorySilently(); // Reload without UI jump
-                            } else {
-                                alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
-                            }
-                        } catch (err) {
-                            alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                        }
-                    });
-                });
-            }
-        }
 
         data.forEach(product => {
             const nearestDay = (() => {
