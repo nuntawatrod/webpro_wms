@@ -57,8 +57,8 @@
                         <div class="relative">
                             <select id="sortSelect"
                                 class="appearance-none pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-700 cursor-pointer transition-all">
-                                <option value="name-asc">ชื่อ A → Z</option>
-                                <option value="name-desc">ชื่อ Z → A</option>
+                                <option value="qty-asc">จำนวน: น้อย → มาก</option>
+                                <option value="qty-desc">จำนวน: มาก → น้อย</option>
                                 <option value="expiry-asc">หมดอายุใกล้ก่อน</option>
                             </select>
                             <svg class="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -223,7 +223,7 @@
             <div id="lotDetailsModalOverlay"
                 class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
                 <div id="lotDetailsModalContent"
-                    class="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-fade-in flex flex-col max-h-[90vh]"
+                    class="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-fade-in flex flex-col max-h-[65vh]"
                     style="display: none;">
 
                     <!-- Header -->

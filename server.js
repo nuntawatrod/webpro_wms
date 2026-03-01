@@ -79,19 +79,21 @@ function initializeDatabase() {
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             full_name TEXT,
-            role TEXT DEFAULT 'staff',
+            role TEXT DEFAULT 'staff' CHECK(role IN ('manager', 'staff')),
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`);
 
-        // Products Table (Added shelf_life_days)
+        // Products Table (Added shelf_life_days and created_by, category_name ENUM)
         db.run(`CREATE TABLE IF NOT EXISTS Products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             product_name TEXT UNIQUE NOT NULL,
             price REAL,
             image_url TEXT,
-            category_name TEXT,
-            status TEXT,
-            shelf_life_days INTEGER DEFAULT 0
+            category_name TEXT CHECK(category_name IN ('เนื้อสัตว์', 'ผักผลไม้', 'อาหารทะเล', 'ของแห้ง', 'ทั่วไป')),
+            status TEXT DEFAULT 'active',
+            shelf_life_days INTEGER DEFAULT 7,
+            created_by INTEGER,
+            FOREIGN KEY (created_by) REFERENCES Users(id) ON DELETE SET NULL
         )`);
 
         // Stock Table
@@ -101,18 +103,31 @@ function initializeDatabase() {
             receive_date DATE,
             expiry_date DATE,
             quantity INTEGER,
-            FOREIGN KEY (product_id) REFERENCES Products(id)
+            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE CASCADE
         )`);
 
         // Transactions_Log Table
         db.run(`CREATE TABLE IF NOT EXISTS Transactions_Log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            action_type VARCHAR(10),
+            action_type VARCHAR(10) CHECK(action_type IN ('ADD', 'WITHDRAW', 'EXPIRED', 'EDIT', 'CREATE_USER', 'DELETE_USER', 'UPDATE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_PRODUCT')),
             product_id INTEGER,
             quantity INTEGER,
             action_date DATETIME DEFAULT CURRENT_TIMESTAMP,
             actor_name VARCHAR(255),
-            FOREIGN KEY (product_id) REFERENCES Products(id)
+            extra_info TEXT,
+            FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE SET NULL
+        )`);
+
+        // Expired_Alerts Table
+        db.run(`CREATE TABLE IF NOT EXISTS Expired_Alerts (
+            alert_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stock_id INTEGER,
+            product_id INTEGER,
+            alert_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'unread',
+            FOREIGN KEY (stock_id) REFERENCES Stock(id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE CASCADE
         )`);
 
         // Seed Admin User
@@ -125,12 +140,18 @@ function initializeDatabase() {
             }
         });
 
-        // Migration: add shelf_life_days if it doesn't exist in the Products table
+        // Migration: add shelf_life_days and created_by if it doesn't exist in the Products table
         db.all("PRAGMA table_info(Products)", (err, cols) => {
             if (!err && cols && !cols.find(c => c.name === 'shelf_life_days')) {
                 db.run("ALTER TABLE Products ADD COLUMN shelf_life_days INTEGER DEFAULT 7", (alterErr) => {
                     if (alterErr) console.error("Migration failed:", alterErr);
                     else console.log("Migration: Added shelf_life_days column to Products.");
+                });
+            }
+            if (!err && cols && !cols.find(c => c.name === 'created_by')) {
+                db.run("ALTER TABLE Products ADD COLUMN created_by INTEGER REFERENCES Users(id) ON DELETE SET NULL", (alterErr) => {
+                    if (alterErr) console.error("Migration created_by failed:", alterErr);
+                    else console.log("Migration: Added created_by column to Products.");
                 });
             }
         });
@@ -154,9 +175,12 @@ function initializeDatabase() {
                 });
             }
             if (!err && cols && !cols.find(c => c.name === 'created_at')) {
-                db.run("ALTER TABLE Users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP", (alterErr) => {
+                db.run("ALTER TABLE Users ADD COLUMN created_at DATETIME", (alterErr) => {
                     if (alterErr) console.error("Migration created_at failed:", alterErr);
-                    else console.log("Migration: Added created_at column to Users.");
+                    else {
+                        console.log("Migration: Added created_at column to Users.");
+                        db.run("UPDATE Users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL");
+                    }
                 });
             }
         });
