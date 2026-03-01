@@ -352,17 +352,34 @@ app.get('/api/inventory', requireAuth, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
 
         const grouped = {};
+        const todayStr = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' }).split(' ')[0];
+
         for (const row of rows) {
             const { product_id, product_name, image_url, category_name, stock_id, receive_date, expiry_date, quantity } = row;
             if (!grouped[product_id]) {
-                grouped[product_id] = { id: product_id, product_name, image_url, category_name, total_quantity: 0, batches: [] };
+                grouped[product_id] = {
+                    id: product_id,
+                    product_name,
+                    image_url,
+                    category_name,
+                    total_quantity: 0,
+                    expired_quantity: 0,
+                    batches: []
+                };
             }
             if (stock_id) {
-                grouped[product_id].total_quantity += quantity;
-                grouped[product_id].batches.push({ stock_id, receive_date, expiry_date, quantity });
+                // Check if expired based on Bangkok time
+                const isExpired = expiry_date < todayStr;
+
+                if (isExpired) {
+                    grouped[product_id].expired_quantity += quantity;
+                } else {
+                    grouped[product_id].total_quantity += quantity;
+                }
+                grouped[product_id].batches.push({ stock_id, receive_date, expiry_date, quantity, isExpired });
             }
         }
-        res.json(Object.values(grouped).filter(p => p.total_quantity > 0 || p.batches.length === 0));
+        res.json(Object.values(grouped).filter(p => p.total_quantity > 0 || p.expired_quantity > 0 || p.batches.length === 0));
     });
 });
 
@@ -553,62 +570,77 @@ app.get('/api/history', requireAuth, (req, res) => {
 });
 
 // Admin APIs
-app.get('/api/admin/dashboard-stats', requireAdmin, (req, res) => {
-    const stats = {};
+app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
+    // 5 KPIs List:
+    const qProducts = `SELECT COUNT(id) AS totalProducts FROM Products`;
+    // Only count active stock towards total stock!
+    const qStock = `SELECT SUM(quantity) AS totalStock FROM Stock WHERE quantity > 0 AND expiry_date >= date('now', 'localtime')`;
+    // Only count active stock towards total value!
+    const qValue = `SELECT SUM(s.quantity * p.price) AS totalValue 
+                    FROM Stock s
+                    JOIN Products p ON s.product_id = p.id
+                    WHERE s.quantity > 0 AND s.expiry_date >= date('now', 'localtime')`;
 
-    db.serialize(() => {
-        // 1. Total Products
-        db.get(`SELECT COUNT(*) as totalProducts FROM Products`, (err, row1) => {
-            stats.totalProducts = row1?.totalProducts || 0;
+    // Transactions
+    const qReceiveTx = `SELECT COUNT(id) AS totalReceiveTx FROM Transactions_Log WHERE action_type = 'ADD'`;
+    const qWithdrawTx = `SELECT COUNT(id) AS totalWithdrawTx FROM Transactions_Log WHERE action_type = 'WITHDRAW'`;
 
-            // 2. Total Stock & Value
-            db.get(`
-                SELECT SUM(s.quantity) as totalStock, SUM(s.quantity * p.price) as totalValue 
-                FROM Stock s JOIN Products p ON s.product_id = p.id 
-                WHERE s.quantity > 0
-            `, (err, row2) => {
-                stats.totalStock = row2?.totalStock || 0;
-                stats.totalValue = row2?.totalValue || 0;
+    // Active Stock List (Under 50)
+    const qLowStock = `
+        SELECT p.id, p.product_name, SUM(s.quantity) AS total_qty
+        FROM Products p
+        JOIN Stock s ON p.id = s.product_id
+        WHERE s.quantity > 0 AND s.expiry_date >= date('now', 'localtime')
+        GROUP BY p.id
+        HAVING total_qty < 50
+        ORDER BY total_qty ASC
+        LIMIT 10
+    `;
 
-                // 3. Transactions Info
-                db.get(`
-                    SELECT 
-                        SUM(CASE WHEN action_type = 'ADD' THEN 1 ELSE 0 END) as totalReceiveTx,
-                        SUM(CASE WHEN action_type = 'WITHDRAW' THEN 1 ELSE 0 END) as totalWithdrawTx
-                    FROM Transactions_Log
-                `, (err, row3) => {
-                    stats.totalReceiveTx = row3?.totalReceiveTx || 0;
-                    stats.totalWithdrawTx = row3?.totalWithdrawTx || 0;
+    // Frequent Receive (Top 10)
+    const qFreqReceive = `
+        SELECT p.id, p.product_name, COUNT(t.id) as freq, SUM(t.quantity) as total_qty
+        FROM Transactions_Log t
+        JOIN Products p ON t.product_id = p.id
+        WHERE t.action_type = 'ADD'
+        GROUP BY p.id
+        ORDER BY freq DESC, total_qty DESC
+        LIMIT 10
+    `;
 
-                    // 4. Low Stock List (< 50)
-                    db.all(`
-                        SELECT p.id, p.product_name, COALESCE(SUM(s.quantity), 0) as total_qty 
-                        FROM Products p 
-                        LEFT JOIN Stock s ON p.id = s.product_id 
-                        GROUP BY p.id 
-                        HAVING total_qty < 50 AND total_qty > 0 
-                        ORDER BY total_qty ASC LIMIT 10
-                    `, [], (err, lowStock) => {
-                        stats.lowStockList = lowStock || [];
+    // Frequent Withdraw (Top 10)
+    const qFreqWithdraw = `
+        SELECT p.id, p.product_name, COUNT(t.id) as freq, SUM(t.quantity) as total_qty
+        FROM Transactions_Log t
+        JOIN Products p ON t.product_id = p.id
+        WHERE t.action_type = 'WITHDRAW'
+        GROUP BY p.id
+        ORDER BY freq DESC, total_qty DESC
+        LIMIT 10
+    `;
 
-                        // 5. Frequent Receive List
-                        db.all(`
-                            SELECT p.id, p.product_name, COUNT(t.id) as freq, SUM(t.quantity) as total_qty 
-                            FROM Transactions_Log t JOIN Products p ON t.product_id = p.id 
-                            WHERE t.action_type = 'ADD' 
-                            GROUP BY p.id ORDER BY freq DESC LIMIT 10
-                        `, [], (err, freqAdd) => {
-                            stats.frequentReceiveList = freqAdd || [];
-
-                            // 6. Frequent Withdraw List
-                            db.all(`
-                                SELECT p.id, p.product_name, COUNT(t.id) as freq, SUM(t.quantity) as total_qty 
-                                FROM Transactions_Log t JOIN Products p ON t.product_id = p.id 
-                                WHERE t.action_type = 'WITHDRAW' 
-                                GROUP BY p.id ORDER BY freq DESC LIMIT 10
-                            `, [], (err, freqWithdraw) => {
-                                stats.frequentWithdrawList = freqWithdraw || [];
-                                res.json(stats);
+    db.get(qProducts, [], (err1, row1) => {
+        db.get(qStock, [], (err2, row2) => {
+            db.get(qValue, [], (err3, row3) => {
+                db.get(qReceiveTx, [], (err4, row4) => {
+                    db.get(qWithdrawTx, [], (err5, row5) => {
+                        db.all(qLowStock, [], (err6, rows6) => {
+                            db.all(qFreqReceive, [], (err7, rows7) => {
+                                db.all(qFreqWithdraw, [], (err8, rows8) => {
+                                    if (err1 || err2 || err3 || err4 || err5 || err6 || err7 || err8) {
+                                        return res.status(500).json({ error: "Failed to load dashboard data" });
+                                    }
+                                    res.json({
+                                        totalProducts: row1?.totalProducts || 0,
+                                        totalStock: row2?.totalStock || 0,
+                                        totalValue: row3?.totalValue || 0,
+                                        totalReceiveTx: row4?.totalReceiveTx || 0,
+                                        totalWithdrawTx: row5?.totalWithdrawTx || 0,
+                                        lowStockList: rows6 || [],
+                                        frequentReceiveList: rows7 || [],
+                                        frequentWithdrawList: rows8 || []
+                                    });
+                                });
                             });
                         });
                     });

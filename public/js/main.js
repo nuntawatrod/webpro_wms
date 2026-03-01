@@ -519,7 +519,8 @@ function initDashboard() {
                 </button>`;
             }
 
-            const isOutOfStock = product.total_quantity === 0;
+            const displayQty = showExpiredMode ? (product.expired_quantity || 0) : product.total_quantity;
+            const isOutOfStock = displayQty === 0;
 
             card.innerHTML = `
                 ${badgeHTML}
@@ -540,7 +541,7 @@ function initDashboard() {
                         <div class="flex items-center">
                             <div>
                                 <p class="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">จำนวนคงเหลือ</p>
-                                <p class="text-2xl font-bold ${isOutOfStock ? 'text-rose-500' : 'text-emerald-600'}">${product.total_quantity}</p>
+                                <p class="text-2xl font-bold ${isOutOfStock ? 'text-rose-500' : 'text-emerald-600'}">${displayQty}</p>
                             </div>
                             ${expandBtnHTML}
                         </div>
@@ -557,40 +558,48 @@ function initDashboard() {
             // Append lot details container (hidden by default)
             let batchesGridHtml = '';
             if (product.batches.length > 0) {
-                const sortedBatches = [...product.batches].sort((a, b) => new Date(a.receive_date) - new Date(b.receive_date));
-                batchesGridHtml = `
-                <div class="hidden absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20 border-t border-slate-200 p-3 batch-grid-rows-${product.id}" style="max-height: 75%; overflow-y: auto;">
-                    <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
-                        <span class="text-xs font-semibold text-slate-600 uppercase tracking-wider">รายละเอียดล็อต</span>
-                        <button class="btn-contract-grid text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-full hover:bg-slate-100 transition-colors" data-id="${product.id}">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        </button>
-                    </div>
-                    <div class="space-y-2">
-                        ${sortedBatches.map(b => {
-                    const daysRemaining = getDaysRemaining(b.expiry_date);
-                    let daysText = '-';
-                    let rowClass = 'bg-white border-slate-200';
-                    let textClass = 'text-slate-600';
+                const filteredBatches = product.batches.filter(b => {
+                    const d = getDaysRemaining(b.expiry_date);
+                    if (d === null) return !showExpiredMode;
+                    if (showExpiredMode) return d < 0;
+                    return d >= 0;
+                });
 
-                    if (daysRemaining !== null) {
-                        daysText = `${daysRemaining} วัน`;
-                        if (daysRemaining < 0) {
-                            daysText = `หมดอายุแล้ว (${Math.abs(daysRemaining)} วัน)`;
-                            rowClass = 'bg-rose-50 border-rose-200';
-                            textClass = 'text-rose-700 font-medium';
-                        } else if (daysRemaining === 0) {
-                            daysText = `วันนี้`;
-                            rowClass = 'bg-rose-50 border-rose-200';
-                            textClass = 'text-rose-700 font-medium';
-                        } else if (daysRemaining <= 2) {
-                            daysText = `ใกล้หมดอายุ (${daysRemaining} วัน)`;
-                            rowClass = 'bg-amber-50 border-amber-200';
-                            textClass = 'text-amber-700 font-medium';
+                if (filteredBatches.length > 0) {
+                    const sortedBatches = [...filteredBatches].sort((a, b) => new Date(a.receive_date) - new Date(b.receive_date));
+                    batchesGridHtml = `
+                    <div class="hidden absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20 border-t border-slate-200 p-3 batch-grid-rows-${product.id}" style="max-height: 75%; overflow-y: auto;">
+                        <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
+                            <span class="text-xs font-semibold text-slate-600 uppercase tracking-wider">รายละเอียดล็อต</span>
+                            <button class="btn-contract-grid text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-full hover:bg-slate-100 transition-colors" data-id="${product.id}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <div class="space-y-2">
+                            ${sortedBatches.map(b => {
+                        const daysRemaining = getDaysRemaining(b.expiry_date);
+                        let daysText = '-';
+                        let rowClass = 'bg-white border-slate-200';
+                        let textClass = 'text-slate-600';
+
+                        if (daysRemaining !== null) {
+                            daysText = `${daysRemaining} วัน`;
+                            if (daysRemaining < 0) {
+                                daysText = `หมดอายุแล้ว (${Math.abs(daysRemaining)} วัน)`;
+                                rowClass = 'bg-rose-50 border-rose-200';
+                                textClass = 'text-rose-700 font-medium';
+                            } else if (daysRemaining === 0) {
+                                daysText = `วันนี้`;
+                                rowClass = 'bg-rose-50 border-rose-200';
+                                textClass = 'text-rose-700 font-medium';
+                            } else if (daysRemaining <= 2) {
+                                daysText = `ใกล้หมดอายุ (${daysRemaining} วัน)`;
+                                rowClass = 'bg-amber-50 border-amber-200';
+                                textClass = 'text-amber-700 font-medium';
+                            }
                         }
-                    }
 
-                    return `
+                        return `
                             <div class="text-sm p-2 rounded border ${rowClass} flex justify-between items-center shadow-sm">
                                 <div>
                                     <span class="block text-xs text-slate-500 mb-0.5">รับเข้า: ${formatDate(b.receive_date)}</span>
@@ -601,10 +610,11 @@ function initDashboard() {
                                 </div>
                             </div>
                             `;
-                }).join('')}
+                    }).join('')}
                     </div>
                 </div>`;
-                card.innerHTML += batchesGridHtml;
+                    card.innerHTML += batchesGridHtml;
+                }
             }
 
             gridView.appendChild(card);
@@ -760,6 +770,8 @@ function initDashboard() {
             const isDanger = !isExpiredProduct && nearestDay !== null && nearestDay === 0;
             const isWarning = !isExpiredProduct && nearestDay !== null && nearestDay <= 2 && nearestDay >= 1;
 
+            const displayQty = showExpiredMode ? (product.expired_quantity || 0) : product.total_quantity;
+
             const tr = document.createElement('tr');
             let rowBg = 'hover:bg-slate-50';
             if (isExpiredProduct) rowBg = 'bg-slate-100/50 text-slate-500 hover:bg-slate-100';
@@ -795,11 +807,11 @@ function initDashboard() {
                     <div class="font-medium ${isExpiredProduct ? 'text-slate-500' : 'text-slate-800'}">${product.product_name}</div>
                     <div class="text-xs text-slate-500 mt-0.5"><span class="bg-slate-100 px-1.5 py-0.5 rounded mr-1">${product.category_name || 'ทั่วไป'}</span> ${product.batches.length} ล็อตการรับ</div>
                 </td>
-                <td class="px-6 py-4 text-right font-semibold ${isExpiredProduct ? 'text-slate-500' : (product.total_quantity === 0 ? 'text-rose-500' : 'text-slate-800')}">${product.total_quantity}</td>
+                <td class="px-6 py-4 text-right font-semibold ${isExpiredProduct ? 'text-slate-500' : (displayQty === 0 ? 'text-rose-500' : 'text-slate-800')}">${displayQty}</td>
                 <td class="px-6 py-4 text-center">
                     ${isExpiredProduct
                     ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600">หมดอายุ</span>`
-                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${product.total_quantity > 0 ? 'มีสินค้า' : 'หมด'}</span>`
+                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${displayQty > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${displayQty > 0 ? 'มีสินค้า' : 'หมด'}</span>`
                 }
                 </td>
                 <td class="px-6 py-4 text-right flex items-center justify-end">
@@ -814,45 +826,53 @@ function initDashboard() {
             tableBody.appendChild(tr);
 
             if (product.batches.length > 0) {
-                const sortedBatches = [...product.batches].sort((a, b) => new Date(a.receive_date) - new Date(b.receive_date));
-                const subRowsContainer = document.createElement('tr');
-                subRowsContainer.className = `hidden bg-slate-50/80 batch-rows-${product.id}`;
+                const filteredBatches = product.batches.filter(b => {
+                    const d = getDaysRemaining(b.expiry_date);
+                    if (d === null) return !showExpiredMode;
+                    if (showExpiredMode) return d < 0;
+                    return d >= 0;
+                });
 
-                let batchesHtml = `<td colspan="5" class="p-0 border-b border-slate-200">
-                    <div class="px-8 py-3 bg-slate-50 border-l-4 border-emerald-500">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="text-slate-500 mb-2 border-b border-slate-200">
-                                    <th class="py-2 font-medium text-left">รับเข้าเมื่อ</th>
-                                    <th class="py-2 font-medium text-left">หมดอายุ</th>
-                                    <th class="py-2 font-medium text-left">อายุขัย</th>
-                                    <th class="py-2 font-medium text-right">จำนวนล็อต</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">`;
+                if (filteredBatches.length > 0) {
+                    const sortedBatches = [...filteredBatches].sort((a, b) => new Date(a.receive_date) - new Date(b.receive_date));
+                    const subRowsContainer = document.createElement('tr');
+                    subRowsContainer.className = `hidden bg-slate-50/80 batch-rows-${product.id}`;
 
-                sortedBatches.forEach(b => {
-                    const daysRemaining = getDaysRemaining(b.expiry_date);
-                    let daysText = '-';
-                    let rowClass = '';
+                    let batchesHtml = `<td colspan="5" class="p-0 border-b border-slate-200">
+                        <div class="px-8 py-3 bg-slate-50 border-l-4 border-emerald-500">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-slate-500 mb-2 border-b border-slate-200">
+                                        <th class="py-2 font-medium text-left">รับเข้าเมื่อ</th>
+                                        <th class="py-2 font-medium text-left">หมดอายุ</th>
+                                        <th class="py-2 font-medium text-left">อายุขัย</th>
+                                        <th class="py-2 font-medium text-right">จำนวนล็อต</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">`;
 
-                    if (daysRemaining !== null) {
-                        daysText = `${daysRemaining} วัน`;
-                        if (daysRemaining < 0) {
-                            daysText = `หมดอายุแล้ว (${Math.abs(daysRemaining)} วัน)`;
-                            rowClass = 'bg-rose-100 text-rose-800 font-semibold';
-                        } else if (daysRemaining === 0) {
-                            rowClass = 'bg-rose-100 text-rose-800 font-semibold';
-                            daysText = `วันนี้`;
-                        } else if (daysRemaining <= 2) {
-                            rowClass = 'bg-amber-100 text-amber-800 font-semibold';
-                            daysText = `ใกล้หมดอายุ (${daysRemaining} วัน)`;
-                        } else if (daysRemaining <= 7) {
-                            rowClass = 'text-amber-600';
+                    sortedBatches.forEach(b => {
+                        const daysRemaining = getDaysRemaining(b.expiry_date);
+                        let daysText = '-';
+                        let rowClass = '';
+
+                        if (daysRemaining !== null) {
+                            daysText = `${daysRemaining} วัน`;
+                            if (daysRemaining < 0) {
+                                daysText = `หมดอายุแล้ว (${Math.abs(daysRemaining)} วัน)`;
+                                rowClass = 'bg-rose-100 text-rose-800 font-semibold';
+                            } else if (daysRemaining === 0) {
+                                rowClass = 'bg-rose-100 text-rose-800 font-semibold';
+                                daysText = `วันนี้`;
+                            } else if (daysRemaining <= 2) {
+                                rowClass = 'bg-amber-100 text-amber-800 font-semibold';
+                                daysText = `ใกล้หมดอายุ (${daysRemaining} วัน)`;
+                            } else if (daysRemaining <= 7) {
+                                rowClass = 'text-amber-600';
+                            }
                         }
-                    }
 
-                    batchesHtml += `
+                        batchesHtml += `
                         <tr class="hover:bg-slate-100/50 ${rowClass}">
                             <td class="py-2.5">${formatDate(b.receive_date)}</td>
                             <td class="py-2.5">${formatDate(b.expiry_date)}</td>
@@ -860,11 +880,12 @@ function initDashboard() {
                             <td class="py-2.5 text-right font-mono">${b.quantity}</td>
                         </tr>
                     `;
-                });
+                    });
 
-                batchesHtml += `</tbody></table></div></td>`;
-                subRowsContainer.innerHTML = batchesHtml;
-                tableBody.appendChild(subRowsContainer);
+                    batchesHtml += `</tbody></table></div></td>`;
+                    subRowsContainer.innerHTML = batchesHtml;
+                    tableBody.appendChild(subRowsContainer);
+                }
             }
         });
 
