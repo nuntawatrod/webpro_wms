@@ -368,6 +368,9 @@ app.get('/admin/users', requireManager, (req, res) => {
 // ==========================================
 
 app.get('/api/inventory', requireAuth, (req, res) => {
+    // Run auto-expire check in the background when inventory is requested
+    autoLogExpiredProducts();
+
     const query = `
         SELECT 
             p.id as product_id, 
@@ -555,12 +558,7 @@ app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
         db.run('BEGIN TRANSACTION');
 
         const stmtDelete = db.prepare('DELETE FROM Stock WHERE id = ?');
-        const stmtLog = db.prepare(`
-            INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) 
-            VALUES ('EXPIRED', ?, ?, ?, ?, ?)
-        `);
 
-        const timestamp = getBangkokTimestamp();
         let errorOccurred = false;
 
         expired_batches.forEach(batch => {
@@ -568,16 +566,10 @@ app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
             stmtDelete.run([batch.stock_id], (err) => {
                 if (err) errorOccurred = true;
             });
-
-            // Log format requirement: "หมดวันไหน กี่จำนวน"
-            const extraInfo = `${batch.product_name} | หมดอายุ: ${batch.expiry_date}`;
-            stmtLog.run([batch.product_id, batch.quantity, req.session.user.username, timestamp, extraInfo], (err) => {
-                if (err) errorOccurred = true;
-            });
+            // EXPIRED logs are now created automatically, so we don't duplicate them here.
         });
 
         stmtDelete.finalize();
-        stmtLog.finalize();
 
         db.run('COMMIT', (err) => {
             if (err || errorOccurred) {
@@ -596,6 +588,7 @@ app.get('/api/history', requireAuth, (req, res) => {
                t.quantity, t.actor_name, t.extra_info
         FROM Transactions_Log t
         LEFT JOIN Products p ON t.product_id = p.id
+        WHERE t.action_type IN ('ADD', 'WITHDRAW', 'EXPIRED')
         ORDER BY t.action_date DESC
     `;
     db.all(query, [], (err, rows) => {
@@ -603,6 +596,76 @@ app.get('/api/history', requireAuth, (req, res) => {
         res.json(rows);
     });
 });
+
+// ==========================================
+// Auto-Log Expired Products Logic
+// ==========================================
+function autoLogExpiredProducts(callback) {
+    db.serialize(() => {
+        // Find stock that is expired (expiry_date < today)
+        // and hasn't been logged in Transactions_Log as 'EXPIRED' for that specific stock_id (if we had stock_id, but we log by product_id and quantity).
+        // Since Transactions_Log doesn't track stock_id directly, we need to be careful.
+        // Let's add an explicit 'is_expired_logged' flag to Stock if possible, or use extra_info to store stock_id.
+        // Since we can't easily alter Stock schema synchronously here without risking issues, we will use a simpler approach:
+        // Match product_id and quantity and date in extra_info.
+
+        // Actually, the most robust way without schema change is to check if a log exists for that specific Stock ID inside extra_info.
+        // Let's ensure 'extra_info' contains the Stock ID when auto-logging.
+
+        const qFindExpired = `
+            SELECT s.id as stock_id, s.product_id, s.quantity, s.expiry_date, p.product_name 
+            FROM Stock s
+            JOIN Products p ON s.product_id = p.id
+            WHERE s.expiry_date < date('now', 'localtime') AND s.quantity > 0
+        `;
+
+        db.all(qFindExpired, [], (err, expiredRows) => {
+            if (err || !expiredRows || expiredRows.length === 0) {
+                if (callback) callback();
+                return;
+            }
+
+            // Check which ones are already logged
+            const qCheckLog = `SELECT extra_info FROM Transactions_Log WHERE action_type = 'EXPIRED' AND extra_info LIKE '%StockID:%'`;
+            db.all(qCheckLog, [], (err2, logRows) => {
+                const loggedStockIds = new Set();
+                if (!err2 && logRows) {
+                    logRows.forEach(row => {
+                        const match = row.extra_info.match(/StockID:(\d+)/);
+                        if (match) loggedStockIds.add(parseInt(match[1], 10));
+                    });
+                }
+
+                const toLog = expiredRows.filter(row => !loggedStockIds.has(row.stock_id));
+                if (toLog.length === 0) {
+                    if (callback) callback();
+                    return;
+                }
+
+                db.run('BEGIN TRANSACTION');
+                const stmtLog = db.prepare(`
+                    INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) 
+                    VALUES ('EXPIRED', ?, ?, 'System/Auto', ?, ?)
+                `);
+
+                const timestamp = getBangkokTimestamp();
+                let errorOccurred = false;
+
+                toLog.forEach(batch => {
+                    const extraInfo = `${batch.product_name} | หมดอายุ: ${batch.expiry_date} | StockID:${batch.stock_id}`;
+                    stmtLog.run([batch.product_id, batch.quantity, timestamp, extraInfo], (e) => {
+                        if (e) errorOccurred = true;
+                    });
+                });
+
+                stmtLog.finalize();
+                db.run('COMMIT', () => {
+                    if (callback) callback();
+                });
+            });
+        });
+    });
+}
 
 // Admin APIs
 app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
@@ -682,6 +745,23 @@ app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
                 });
             });
         });
+    });
+});
+
+app.get('/api/admin/system-logs', requireManager, (req, res) => {
+    const query = `
+        SELECT t.id, t.action_date, t.action_type,
+               COALESCE(p.product_name, '[ไม่มี]') AS product_name,
+               t.quantity, t.actor_name, t.extra_info
+        FROM Transactions_Log t
+        LEFT JOIN Products p ON t.product_id = p.id
+        WHERE t.action_type IN ('CREATE_USER', 'DELETE_USER', 'UPDATE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_PRODUCT')
+        ORDER BY t.action_date DESC
+        LIMIT 50
+    `;
+    db.all(query, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
     });
 });
 

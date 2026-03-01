@@ -200,12 +200,12 @@
 
                 async function loadStats() {
                     try {
-                        const [statsRes, historyRes] = await Promise.all([
+                        const [statsRes, sysLogsRes] = await Promise.all([
                             fetch('/api/admin/dashboard-stats'),
-                            fetch('/api/history')
+                            fetch('/api/admin/system-logs')
                         ]);
                         statsData = await statsRes.json();
-                        const history = await historyRes.json();
+                        const mgmtLogs = await sysLogsRes.json();
 
                         // 1. Summary cards
                         document.getElementById('statTotalProducts').textContent = (statsData.totalProducts ?? '—').toLocaleString();
@@ -232,9 +232,6 @@
                         renderFrequentTable();
 
                         // 4. User/Product management actions only
-                        const mgmtTypes = ['CREATE_USER', 'DELETE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_USER', 'UPDATE_PRODUCT'];
-                        const mgmtLogs = history.filter(l => mgmtTypes.includes(l.action_type));
-
                         const tbody = document.getElementById('recentActivity');
                         if (mgmtLogs.length === 0) {
                             tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-slate-400">ยังไม่มีรายการจัดการระบบ</td></tr>';
