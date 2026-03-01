@@ -29,11 +29,17 @@ function showToast(message, type = 'success') {
 
 function getDaysRemaining(expiryDateStr) {
     if (!expiryDateStr) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expiry = new Date(expiryDateStr);
+
+    // Get current date exactly in Asia/Bangkok
+    const bkkTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+    const todayStr = bkkTime.getFullYear() + '-' + String(bkkTime.getMonth() + 1).padStart(2, '0') + '-' + String(bkkTime.getDate()).padStart(2, '0');
+
+    // Map strictly to UTC midnights for accurate day math
+    const today = new Date(todayStr + "T00:00:00Z");
+    const expiry = new Date(expiryDateStr + "T00:00:00Z");
+
     const diffTime = expiry - today;
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
 function formatDate(dateStr) {
