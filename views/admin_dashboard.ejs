@@ -26,13 +26,8 @@
                         </button>
                         <button
                             class="admin-tab px-5 py-3 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent hover:border-slate-300 whitespace-nowrap"
-                            data-tab="products">
-                            จัดการสินค้า
-                        </button>
-                        <button
-                            class="admin-tab px-5 py-3 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent hover:border-slate-300 whitespace-nowrap"
-                            data-tab="users">
-                            จัดการผู้ใช้งาน
+                            data-tab="logs">
+                            บันทึกระบบ (System Logs)
                         </button>
                     </nav>
                 </div>
@@ -41,345 +36,146 @@
                 <div id="tab-stats" class="tab-panel">
 
                     <!-- Summary Stat Cards -->
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">สินค้าในคลัง
-                            </p>
-                            <p id="statTotalProducts" class="text-3xl font-bold text-slate-800">—</p>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                สินค้าในคลัง</p>
+                            <p id="statTotalProducts" class="text-2xl font-bold text-slate-800">—</p>
                         </div>
-                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">
-                                จำนวนสต็อกทั้งหมด</p>
-                            <p id="statTotalStock" class="text-3xl font-bold text-emerald-600">—</p>
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                จำนวนสต็อกรวม</p>
+                            <p id="statTotalStock" class="text-2xl font-bold text-emerald-600">—</p>
                         </div>
-                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                            <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">
-                                รายการเบิก-รับทั้งหมด</p>
-                            <p id="statTotalTx" class="text-3xl font-bold text-blue-600">—</p>
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">มูลค่ารวม
+                                (บาท)</p>
+                            <p id="statTotalValue" class="text-2xl font-bold text-indigo-600">—</p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                รายการนำเข้าซ้ำ</p>
+                            <p id="statTotalReceive" class="text-2xl font-bold text-blue-600">—</p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                                รายการเบิกออก</p>
+                            <p id="statTotalWithdraw" class="text-2xl font-bold text-rose-600">—</p>
                         </div>
                     </div>
 
-                    <!-- Charts Row -->
+
+                    <!-- Dual Tables -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                        <!-- Top 5 Sellers Chart -->
-                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 class="text-base font-semibold text-slate-800 mb-4">5 อันดับสินค้าขายดีสุด</h2>
-                            <div class="relative h-64">
-                                <canvas id="chartTop5"></canvas>
-                                <p id="chartTop5Empty"
-                                    class="hidden absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
-                                    ยังไม่มีข้อมูลการเบิกสินค้า</p>
+                        <!-- Left: Low Stock -->
+                        <div
+                            class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            <div
+                                class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-rose-50/30">
+                                <h2 class="text-base font-semibold text-rose-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                                        </path>
+                                    </svg>
+                                    สินค้าที่เหลือน้อย (< 50 ชิ้น) </h2>
+                            </div>
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left text-sm">
+                                    <thead>
+                                        <tr
+                                            class="bg-slate-50 text-[11px] text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
+                                            <th class="px-5 py-3">รหัส</th>
+                                            <th class="px-5 py-3">ชื่อสินค้า</th>
+                                            <th class="px-5 py-3 text-right">จำนวนคงเหลือ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbLowStock" class="divide-y divide-slate-100">
+                                        <tr>
+                                            <td colspan="3" class="px-5 py-6 text-center text-slate-400">กำลังโหลด...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
-                        <!-- Worst 5 Sellers Chart -->
-                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 class="text-base font-semibold text-slate-800 mb-4">5 อันดับสินค้าขายช้าสุด</h2>
-                            <div class="relative h-64">
-                                <canvas id="chartWorst5"></canvas>
-                                <p id="chartWorst5Empty"
-                                    class="hidden absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
-                                    ยังไม่มีข้อมูลการเบิกสินค้า</p>
+                        <!-- Right: Frequent Access -->
+                        <div
+                            class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="px-5 py-3 border-b border-slate-100 flex justify-between items-center">
+                                <h2 class="text-base font-semibold text-slate-800">สินค้าที่มีการทำรายการบ่อย</h2>
+                                <div class="flex bg-slate-100 p-1 rounded-lg">
+                                    <button onclick="toggleFreqTab('receive')" id="btnFreqReceive"
+                                        class="px-3 py-1.5 text-xs font-semibold rounded-md bg-white shadow-sm text-blue-700 transition duration-150">นำเข้าบ่อย</button>
+                                    <button onclick="toggleFreqTab('withdraw')" id="btnFreqWithdraw"
+                                        class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-500 hover:text-slate-700 transition duration-150">เบิกออกบ่อย</button>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left text-sm">
+                                    <thead>
+                                        <tr
+                                            class="bg-slate-50 text-[11px] text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
+                                            <th class="px-5 py-3">สินค้า</th>
+                                            <th class="px-5 py-3 text-center">ความถี่ (ครั้ง)</th>
+                                            <th class="px-5 py-3 text-right">จำนวนรวม</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbFrequent" class="divide-y divide-slate-100">
+                                        <tr>
+                                            <td colspan="3" class="px-5 py-6 text-center text-slate-400">กำลังโหลด...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Recent Activity -->
+                </div>
+
+                <!-- Tab: System Logs -->
+                <div id="tab-logs" class="tab-panel hidden space-y-8">
+
+                    <!-- Admin/User Management Activity -->
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-slate-100">
-                            <h2 class="text-base font-semibold text-slate-800">ประวัติล่าสุด (10 รายการ)</h2>
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50">
+                            <h2 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                ประวัติการจัดการระบบ (สร้าง/ลบ สินค้าและผู้ใช้งาน)
+                            </h2>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
                                 <thead>
                                     <tr
-                                        class="bg-slate-50 text-xs text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
+                                        class="bg-white text-xs text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-100">
                                         <th class="px-6 py-3">วัน-เวลา</th>
                                         <th class="px-6 py-3">ประเภท</th>
-                                        <th class="px-6 py-3">สินค้า</th>
-                                        <th class="px-6 py-3 text-right">จำนวน</th>
-                                        <th class="px-6 py-3">ผู้ทำรายการ</th>
+                                        <th class="px-6 py-3">รายละเอียด</th>
+                                        <th class="px-6 py-3">ผู้ดำเนินการ</th>
                                     </tr>
                                 </thead>
                                 <tbody id="recentActivity" class="divide-y divide-slate-100">
                                     <tr>
-                                        <td colspan="5" class="px-6 py-6 text-center text-slate-400">กำลังโหลด...</td>
+                                        <td colspan="4" class="px-6 py-6 text-center text-slate-400">กำลังโหลด...</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                </div>
-
-                <!-- Tab: Product Management -->
-                <div id="tab-products" class="tab-panel hidden">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                        <h2 class="text-base font-semibold text-slate-800">รายการสินค้าทั้งหมด <span id="productCount"
-                                class="text-xs font-normal text-slate-400"></span></h2>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <div class="relative">
-                                <input id="productSearchInput" type="text" placeholder="ค้นหาชื่อสินค้า / หมวดหมู่..."
-                                    class="pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-56 transition-all">
-                                <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                </svg>
-                            </div>
-                            <button id="btnCreateProduct"
-                                class="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm transition-all focus:outline-none shrink-0">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 4v16m8-8H4"></path>
-                                </svg>
-                                เพิ่มสินค้าใหม่
-                            </button>
-                        </div>
-                    </div>
-                    <div class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr
-                                        class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                                        <th class="px-4 py-4">ID</th>
-                                        <th class="px-4 py-4">ชื่อสินค้า</th>
-                                        <th class="px-4 py-4">หมวดหมู่</th>
-                                        <th class="px-4 py-4 text-right">ราคา</th>
-                                        <th class="px-4 py-4 text-right">อายุ (วัน)</th>
-                                        <th class="px-4 py-4 text-center">จัดการ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="productTableBody" class="divide-y divide-slate-100">
-                                    <tr>
-                                        <td colspan="6" class="px-4 py-4 text-center text-slate-500 text-sm">
-                                            กำลังโหลด...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <!-- Product Pagination -->
-                    <div id="productPagination" class="mt-4 flex items-center justify-between text-sm text-slate-500">
-                    </div>
-                </div>
-
-                <!-- Tab: User Management -->
-                <div id="tab-users" class="tab-panel hidden">
-
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-base font-semibold text-slate-800">รายชื่อบัญชีผู้ใช้งาน</h2>
-                        <button id="btnCreateUser"
-                            class="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm transition-all focus:outline-none">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z">
-                                </path>
-                            </svg>
-                            สร้างบัญชีใหม่
-                        </button>
-                    </div>
-
-                    <div class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr
-                                        class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                                        <th class="px-6 py-4">ID</th>
-                                        <th class="px-6 py-4">ชื่อผู้ใช้</th>
-                                        <th class="px-6 py-4">บทบาท</th>
-                                        <th class="px-6 py-4 text-center">จัดการ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="userTableBody" class="divide-y divide-slate-100">
-                                    <tr>
-                                        <td colspan="4" class="px-6 py-4 text-center text-slate-500 text-sm">
-                                            กำลังโหลด...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
 
             </main>
 
-            <!-- Product Create/Edit Modal -->
-            <div id="productModal"
-                class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
-                <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                        <h2 id="productModalTitle" class="text-lg font-semibold text-slate-800">เพิ่มสินค้าใหม่</h2>
-                        <button onclick="closeProductModal()" class="text-slate-400 hover:text-rose-500">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                    <form id="productForm" class="p-6 space-y-4">
-                        <input type="hidden" id="editProductId">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="col-span-2">
-                                <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อสินค้า <span
-                                        class="text-rose-500">*</span></label>
-                                <input type="text" id="productName" required placeholder="เช่น นมสด ตราเต็มไขมัน"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                                    autocomplete="off">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">หมวดหมู่ <span
-                                        class="text-rose-500">*</span></label>
-                                <select id="productCategory" required
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white">
-                                    <option value="">เลือกหมวดหมู่...</option>
-                                    <option value="เนื้อสัตว์">เนื้อสัตว์</option>
-                                    <option value="ผัก">ผัก</option>
-                                    <option value="ผลไม้">ผลไม้</option>
-                                    <option value="นม/ไข่">นม/ไข่</option>
-                                    <option value="อาหารทะเล">อาหารทะเล</option>
-                                    <option value="เครื่องดื่ม">เครื่องดื่ม</option>
-                                    <option value="อื่นๆ">อื่นๆ</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">ราคา (บาท)</label>
-                                <input type="number" id="productPrice" min="0" step="0.01" placeholder="0.00"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">อายุการเก็บรักษา (วัน)
-                                    <span class="text-rose-500">*</span></label>
-                                <input type="number" id="productShelfLife" min="1" required placeholder="7"
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">URL รูปภาพ</label>
-                                <input type="text" id="productImageUrl" placeholder="https://..."
-                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
-                            </div>
-                        </div>
-                        <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100">
-                            <button type="button" onclick="closeProductModal()"
-                                class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">ยกเลิก</button>
-                            <button type="submit"
-                                class="px-4 py-2 bg-emerald-600 rounded-lg text-sm font-medium text-white hover:bg-emerald-700 shadow-sm">บันทึก</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Edit User Modal -->
-            <div id="editUserModal"
-                class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
-                <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                        <h2 class="text-lg font-semibold text-slate-800">แก้ไขบัญชีผู้ใช้</h2>
-                        <button onclick="document.getElementById('editUserModal').classList.add('hidden')"
-                            class="text-slate-400 hover:text-rose-500">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                    <form id="editUserForm" class="p-6 space-y-4">
-                        <input type="hidden" id="editUserId">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้</label>
-                            <input type="text" id="editUserUsername" disabled
-                                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">บทบาท</label>
-                            <div class="grid grid-cols-2 gap-3">
-                                <label
-                                    class="flex items-center text-sm cursor-pointer border px-4 py-2.5 rounded-lg hover:bg-slate-50">
-                                    <input type="radio" name="editRole" value="user"
-                                        class="mr-2 text-emerald-600 focus:ring-emerald-500"> ผู้ใช้ทั่วไป
-                                </label>
-                                <label
-                                    class="flex items-center text-sm cursor-pointer border px-4 py-2.5 rounded-lg hover:bg-slate-50">
-                                    <input type="radio" name="editRole" value="admin"
-                                        class="mr-2 text-emerald-600 focus:ring-emerald-500"> ผู้ดูแลระบบ
-                                </label>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">รหัสผ่านใหม่ <span
-                                    class="text-slate-400 text-xs">(เว้นว่างถ้าไม่ต้องการเปลี่ยน)</span></label>
-                            <input type="password" id="editUserPassword" placeholder="••••••••"
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
-                        </div>
-                        <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100">
-                            <button type="button"
-                                onclick="document.getElementById('editUserModal').classList.add('hidden')"
-                                class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">ยกเลิก</button>
-                            <button type="submit"
-                                class="px-4 py-2 bg-emerald-600 rounded-lg text-sm font-medium text-white hover:bg-emerald-700 shadow-sm">บันทึก</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Create User Modal -->
-            <div id="createUserModal"
-                class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
-                <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                        <h2 class="text-lg font-semibold text-slate-800">สร้างบัญชีผู้ใช้ใหม่</h2>
-                        <button onclick="document.getElementById('createUserModal').classList.add('hidden')"
-                            class="text-slate-400 hover:text-rose-500">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                    <form id="createUserForm" class="p-6 space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้ <span
-                                    class="text-rose-500">*</span></label>
-                            <input type="text" id="newUsername" required
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                                autocomplete="off">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">รหัสผ่าน <span
-                                    class="text-rose-500">*</span></label>
-                            <input type="password" id="newPassword" required
-                                class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">บทบาท</label>
-                            <div class="grid grid-cols-2 gap-3">
-                                <label
-                                    class="flex items-center text-sm cursor-pointer border px-4 py-2.5 rounded-lg hover:bg-slate-50">
-                                    <input type="radio" name="newRole" value="user" checked
-                                        class="mr-2 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
-                                    ผู้ใช้ทั่วไป
-                                </label>
-                                <label
-                                    class="flex items-center text-sm cursor-pointer border px-4 py-2.5 rounded-lg hover:bg-slate-50">
-                                    <input type="radio" name="newRole" value="admin"
-                                        class="mr-2 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
-                                    ผู้ดูแลระบบ
-                                </label>
-                            </div>
-                        </div>
-                        <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100">
-                            <button type="button"
-                                onclick="document.getElementById('createUserModal').classList.add('hidden')"
-                                class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">ยกเลิก</button>
-                            <button type="submit"
-                                class="px-4 py-2 bg-emerald-600 rounded-lg text-sm font-medium text-white hover:bg-emerald-700 shadow-sm">บันทึก</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Chart.js CDN -->
-            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
             <script>
                 const AUTH_USER = { username: "<%= locals.user ? locals.user.username : '' %>", role: "<%= locals.user ? locals.user.role : '' %>" };
 
@@ -399,368 +195,129 @@
                     });
                 });
 
-                // --- Load Stats & Charts ---
+                let statsData = null;
+                let currentFreqTab = 'receive';
+
                 async function loadStats() {
                     try {
-                        const [statsRes, historyRes] = await Promise.all([
+                        const [statsRes, sysLogsRes] = await Promise.all([
                             fetch('/api/admin/dashboard-stats'),
-                            fetch('/api/history')
+                            fetch('/api/admin/system-logs')
                         ]);
-                        const stats = await statsRes.json();
-                        const history = await historyRes.json();
+                        statsData = await statsRes.json();
+                        const mgmtLogs = await sysLogsRes.json();
 
-                        // Summary cards
-                        document.getElementById('statTotalProducts').textContent = (stats.totalProducts ?? '—').toLocaleString();
-                        document.getElementById('statTotalStock').textContent = (stats.totalStock ?? '—').toLocaleString();
-                        document.getElementById('statTotalTx').textContent = (stats.totalTx ?? '—').toLocaleString();
+                        // 1. Summary cards
+                        document.getElementById('statTotalProducts').textContent = (statsData.totalProducts ?? '—').toLocaleString();
+                        document.getElementById('statTotalStock').textContent = (statsData.totalStock ?? '—').toLocaleString();
+                        document.getElementById('statTotalValue').textContent = "฿" + (statsData.totalValue ?? '—').toLocaleString(undefined, { minimumFractionDigits: 2 });
+                        document.getElementById('statTotalReceive').textContent = (statsData.totalReceiveTx ?? '—').toLocaleString();
+                        document.getElementById('statTotalWithdraw').textContent = (statsData.totalWithdrawTx ?? '—').toLocaleString();
 
-                        // Charts
-                        function makeChart(canvasId, emptyId, labels, values, color) {
-                            if (!values.length) {
-                                document.getElementById(emptyId).classList.remove('hidden');
-                                document.getElementById(canvasId).classList.add('hidden');
-                                return;
-                            }
-                            new Chart(document.getElementById(canvasId), {
-                                type: 'bar',
-                                data: {
-                                    labels,
-                                    datasets: [{ data: values, backgroundColor: color, borderRadius: 6, barThickness: 28 }]
-                                },
-                                options: {
-                                    responsive: true, maintainAspectRatio: false,
-                                    plugins: { legend: { display: false } },
-                                    scales: {
-                                        x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 30 } },
-                                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 } } }
-                                    }
-                                }
-                            });
+                        // 2. Low Stock Table
+                        const tbLow = document.getElementById('tbLowStock');
+                        if (!statsData.lowStockList || statsData.lowStockList.length === 0) {
+                            tbLow.innerHTML = '<tr><td colspan="3" class="px-5 py-6 text-center text-slate-400">ยังไม่มีรายการเตือน</td></tr>';
+                        } else {
+                            tbLow.innerHTML = statsData.lowStockList.map(item => {
+                                return `<tr class="hover:bg-slate-50">
+                                    <td class="px-5 py-3 text-[11px] font-mono text-slate-400">#${item.id}</td>
+                                    <td class="px-5 py-3 font-medium text-slate-700">${item.product_name}</td>
+                                    <td class="px-5 py-3 text-right text-rose-600 font-bold">${item.total_qty}</td>
+                                </tr>`;
+                            }).join('');
                         }
 
-                        makeChart('chartTop5', 'chartTop5Empty',
-                            stats.top5.map(i => i.product_name.substring(0, 12) + (i.product_name.length > 12 ? '…' : '')),
-                            stats.top5.map(i => i.total_sold),
-                            'rgba(16, 185, 129, 0.7)'
-                        );
+                        // 3. Render Frequent Table
+                        renderFrequentTable();
 
-                        makeChart('chartWorst5', 'chartWorst5Empty',
-                            stats.worst5.map(i => i.product_name.substring(0, 12) + (i.product_name.length > 12 ? '…' : '')),
-                            stats.worst5.map(i => i.total_sold),
-                            'rgba(239, 68, 68, 0.7)'
-                        );
-
-                        // Recent Activity
+                        // 4. User/Product management actions only
                         const tbody = document.getElementById('recentActivity');
-                        const recent = history.slice(0, 10);
-                        if (recent.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-6 text-center text-slate-400">ยังไม่มีรายการ</td></tr>';
+                        if (mgmtLogs.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-slate-400">ยังไม่มีรายการจัดการระบบ</td></tr>';
                         } else {
-                            tbody.innerHTML = recent.map(log => {
-                                const isAdd = log.action_type === 'ADD';
-                                const d = new Date(log.action_date);
-                                const dt = d.toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-                                const badge = isAdd
-                                    ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">รับเข้า</span>'
-                                    : '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">เบิกออก</span>';
+                            tbody.innerHTML = mgmtLogs.map(log => {
+                                const rawDate = (log.action_date || '');
+                                const d = new Date(rawDate.replace(' ', 'T') + '+07:00');
+                                const dt = isNaN(d.getTime()) ? rawDate : d.toLocaleString('th-TH', {
+                                    day: '2-digit', month: 'short',
+                                    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok'
+                                });
+
+                                let badge = '';
+                                let detail = log.extra_info || log.product_name || '-';
+
+                                if (log.action_type === 'CREATE_USER') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">สร้างผู้ใช้</span>';
+                                } else if (log.action_type === 'DELETE_USER') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">ลบผู้ใช้</span>';
+                                } else if (log.action_type === 'UPDATE_USER') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">แก้ไขผู้ใช้</span>';
+                                } else if (log.action_type === 'CREATE_PRODUCT') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">เพิ่มสินค้า</span>';
+                                } else if (log.action_type === 'DELETE_PRODUCT') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">ลบสินค้า</span>';
+                                } else if (log.action_type === 'UPDATE_PRODUCT') {
+                                    badge = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">แก้ไขสินค้า</span>';
+                                }
+
                                 return `<tr class="hover:bg-slate-50">
-                            <td class="px-6 py-3 text-slate-400 text-xs whitespace-nowrap">${dt}</td>
-                            <td class="px-6 py-3">${badge}</td>
-                            <td class="px-6 py-3 text-slate-800 font-medium">${log.product_name}</td>
-                            <td class="px-6 py-3 text-right font-mono font-bold ${isAdd ? 'text-emerald-600' : 'text-rose-600'}">${isAdd ? '+' : '-'}${log.quantity}</td>
-                            <td class="px-6 py-3 text-slate-500">${log.actor_name}</td>
-                        </tr>`;
+                                    <td class="px-6 py-3 text-slate-400 text-xs whitespace-nowrap">${dt}</td>
+                                    <td class="px-6 py-3">${badge}</td>
+                                    <td class="px-6 py-3 text-slate-800 font-medium">${detail}</td>
+                                    <td class="px-6 py-3 text-slate-500">${log.actor_name || '-'}</td>
+                                </tr>`;
                             }).join('');
                         }
 
                     } catch (e) { console.error(e); }
                 }
 
+                window.toggleFreqTab = function (tab) {
+                    currentFreqTab = tab;
 
-                // --- Product Management ---
-                let allProducts = [];
-                let productPage = 1;
-                const PRODUCT_PAGE_SIZE = 100;
+                    // Update buttons
+                    const btnR = document.getElementById('btnFreqReceive');
+                    const btnW = document.getElementById('btnFreqWithdraw');
 
-                function loadProducts() {
-                    const tbody = document.getElementById('productTableBody');
-                    fetch('/api/admin/products').then(r => r.json()).then(products => {
-                        allProducts = products;
-                        productPage = 1;
-                        renderProductTable();
-                    }).catch(() => {
-                        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-rose-500">โหลดข้อมูลล้มเหลว</td></tr>';
-                    });
+                    if (tab === 'receive') {
+                        btnR.className = "px-3 py-1.5 text-xs font-semibold rounded-md bg-white shadow-sm text-blue-700 transition duration-150";
+                        btnW.className = "px-3 py-1.5 text-xs font-medium rounded-md text-slate-500 hover:text-slate-700 transition duration-150";
+                    } else {
+                        btnW.className = "px-3 py-1.5 text-xs font-semibold rounded-md bg-white shadow-sm text-rose-700 transition duration-150";
+                        btnR.className = "px-3 py-1.5 text-xs font-medium rounded-md text-slate-500 hover:text-slate-700 transition duration-150";
+                    }
+
+                    renderFrequentTable();
                 }
 
-                function renderProductTable() {
-                    const query = (document.getElementById('productSearchInput')?.value || '').toLowerCase().trim();
-                    const filtered = query
-                        ? allProducts.filter(p =>
-                            p.product_name.toLowerCase().includes(query) ||
-                            (p.category_name || '').toLowerCase().includes(query))
-                        : allProducts;
+                function renderFrequentTable() {
+                    const tbFreq = document.getElementById('tbFrequent');
+                    if (!statsData) return;
 
-                    const total = filtered.length;
-                    const totalPages = Math.max(1, Math.ceil(total / PRODUCT_PAGE_SIZE));
-                    if (productPage > totalPages) productPage = totalPages;
+                    const list = currentFreqTab === 'receive' ? statsData.frequentReceiveList : statsData.frequentWithdrawList;
+                    const colorScore = currentFreqTab === 'receive' ? 'text-blue-600' : 'text-rose-600';
 
-                    const start = (productPage - 1) * PRODUCT_PAGE_SIZE;
-                    const pageItems = filtered.slice(start, start + PRODUCT_PAGE_SIZE);
-
-                    // Update count label
-                    document.getElementById('productCount').textContent =
-                        query ? `(พบ ${total} / ${allProducts.length})` : `(${total} รายการ)`;
-
-                    const tbody = document.getElementById('productTableBody');
-                    if (!pageItems.length) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่พบสินค้าที่ตรงกับคำค้นหา</td></tr>';
+                    if (!list || list.length === 0) {
+                        tbFreq.innerHTML = '<tr><td colspan="3" class="px-5 py-6 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>';
                     } else {
-                        tbody.innerHTML = pageItems.map(p => {
-                            const encName = p.product_name.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-                            const encImg = (p.image_url || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-                            const encCat = (p.category_name || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-                            const thumb = p.image_url
-                                ? `<img src="${encImg}" class="w-9 h-9 rounded-lg object-cover border border-slate-100 bg-slate-50" onerror="this.style.display='none'">`
-                                : `<div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
-                            return `<tr class="hover:bg-slate-50 transition-colors"
-                                        data-pid="${p.id}" data-name="${encName}" data-price="${p.price}"
-                                        data-img="${encImg}" data-cat="${encCat}" data-shelf="${p.shelf_life_days}">
-                                <td class="px-4 py-3 text-sm text-slate-400 font-mono">${p.id}</td>
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-3">${thumb}
-                                        <span class="font-medium text-slate-800 text-sm">${p.product_name}</span>
+                        tbFreq.innerHTML = list.map(item => {
+                            return `<tr class="hover:bg-slate-50">
+                                <td class="px-5 py-3">
+                                    <div class="flex items-center gap-2 font-medium text-slate-800">
+                                        ${item.product_name}
                                     </div>
+                                    <div class="text-[10px] text-slate-400 font-mono mt-0.5">#${item.id}</div>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-slate-500">${p.category_name || '—'}</td>
-                                <td class="px-4 py-3 text-sm text-right font-mono">${p.price > 0 ? Number(p.price).toFixed(2) : '—'}</td>
-                                <td class="px-4 py-3 text-sm text-right font-mono">${p.shelf_life_days}</td>
-                                <td class="px-4 py-3 text-center">
-                                    <div class="flex items-center justify-center gap-1">
-                                        <button data-action="edit-product" class="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors" title="แก้ไข">
-                                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                        </button>
-                                        <button data-action="delete-product" class="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors" title="ลบ">
-                                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                </td>
+                                <td class="px-5 py-3 text-center font-bold ${colorScore}">${item.freq}</td>
+                                <td class="px-5 py-3 text-right text-slate-600 font-mono font-bold">${item.total_qty}</td>
                             </tr>`;
                         }).join('');
                     }
-
-                    // Render pagination
-                    const pg = document.getElementById('productPagination');
-                    if (totalPages <= 1) { pg.innerHTML = ''; return; }
-                    const prevDis = productPage === 1 ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'hover:bg-slate-100';
-                    const nextDis = productPage === totalPages ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'hover:bg-slate-100';
-                    pg.innerHTML = `
-                        <span>แสดง ${start + 1}–${Math.min(start + PRODUCT_PAGE_SIZE, total)} จาก ${total} รายการ</span>
-                        <div class="flex gap-1">
-                            <button id="productPrevBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm ${prevDis}">ก่อนหน้า</button>
-                            <span class="px-3 py-1.5 text-sm font-semibold text-emerald-700">${productPage} / ${totalPages}</span>
-                            <button id="productNextBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm ${nextDis}">ถัดไป</button>
-                        </div>`;
-
-                    document.getElementById('productPrevBtn')?.addEventListener('click', () => { productPage--; renderProductTable(); });
-                    document.getElementById('productNextBtn')?.addEventListener('click', () => { productPage++; renderProductTable(); });
                 }
 
-                // Search input
-                document.getElementById('productSearchInput').addEventListener('input', () => {
-                    productPage = 1;
-                    renderProductTable();
-                });
-
-                // Event delegation for product table buttons
-                document.getElementById('productTableBody').addEventListener('click', (e) => {
-                    const btn = e.target.closest('[data-action]');
-                    if (!btn) return;
-                    const row = btn.closest('tr');
-                    const id = row.dataset.pid;
-                    const name = row.dataset.name;
-                    const price = row.dataset.price;
-                    const imgUrl = row.dataset.img;
-                    const category = row.dataset.cat;
-                    const shelfLife = row.dataset.shelf;
-                    if (btn.dataset.action === 'edit-product') {
-                        openEditProduct(id, name, price, imgUrl, category, shelfLife);
-                    } else if (btn.dataset.action === 'delete-product') {
-                        deleteProduct(id, name);
-                    }
-                });
-
-
-                function closeProductModal() {
-                    document.getElementById('productModal').classList.add('hidden');
-                    document.getElementById('productForm').reset();
-                    document.getElementById('editProductId').value = '';
-                }
-
-                document.getElementById('btnCreateProduct').addEventListener('click', () => {
-                    document.getElementById('productModalTitle').textContent = 'เพิ่มสินค้าใหม่';
-                    document.getElementById('productForm').reset();
-                    document.getElementById('editProductId').value = '';
-                    document.getElementById('productShelfLife').value = 7;
-                    document.getElementById('productModal').classList.remove('hidden');
-                });
-
-                window.openEditProduct = (id, name, price, imgUrl, category, shelfLife) => {
-                    document.getElementById('productModalTitle').textContent = 'แก้ไขสินค้า';
-                    document.getElementById('editProductId').value = id;
-                    document.getElementById('productName').value = name;
-                    document.getElementById('productPrice').value = price || '';
-                    document.getElementById('productImageUrl').value = imgUrl || '';
-                    document.getElementById('productCategory').value = category || '';
-                    document.getElementById('productShelfLife').value = shelfLife || 7;
-                    document.getElementById('productModal').classList.remove('hidden');
-                };
-
-                document.getElementById('productForm').addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const id = document.getElementById('editProductId').value;
-                    const isEdit = !!id;
-                    const payload = {
-                        product_name: document.getElementById('productName').value.trim(),
-                        price: document.getElementById('productPrice').value,
-                        image_url: document.getElementById('productImageUrl').value.trim(),
-                        category_name: document.getElementById('productCategory').value.trim(),
-                        shelf_life_days: document.getElementById('productShelfLife').value
-                    };
-                    try {
-                        const res = await fetch(isEdit ? `/api/admin/products/${id}` : '/api/admin/products', {
-                            method: isEdit ? 'PUT' : 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        const result = await res.json();
-                        if (res.ok) {
-                            Swal.fire('สำเร็จ!', isEdit ? 'แก้ไขสินค้าเรียบร้อย' : 'เพิ่มสินค้าใหม่เรียบร้อย', 'success');
-                            closeProductModal();
-                            loadProducts();
-                        } else {
-                            Swal.fire('ล้มเหลว', result.error, 'error');
-                        }
-                    } catch { Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง', 'error'); }
-                });
-
-                window.deleteProduct = async (id, name) => {
-                    const conf = await Swal.fire({
-                        title: `ลบสินค้า?`,
-                        text: `"${name}" จะถูกลบพร้อมสต็อกและประวัติทั้งหมด`,
-                        icon: 'warning', showCancelButton: true,
-                        confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b',
-                        confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก'
-                    });
-                    if (!conf.isConfirmed) return;
-                    const res = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' });
-                    if (res.ok) { loadProducts(); Swal.fire('ลบสำเร็จ!', '', 'success'); }
-                    else { const d = await res.json(); Swal.fire('ลบล้มเหลว', d.error, 'error'); }
-                };
-
-                // --- User Management ---
-                function loadUsers() {
-                    const tableBody = document.getElementById('userTableBody');
-                    fetch('/api/admin/users').then(r => r.json()).then(users => {
-                        tableBody.innerHTML = users.map(u => {
-                            const roleBadge = u.role === 'admin'
-                                ? '<span class="px-2.5 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-semibold">Admin</span>'
-                                : '<span class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-semibold">User</span>';
-                            const isSelf = u.username === AUTH_USER.username;
-                            const actions = isSelf
-                                ? '<span class="text-xs text-slate-400">(บัญชีของคุณ)</span>'
-                                : `<div class="flex items-center justify-center gap-1">
-                                    <button onclick="openEditUser(${u.id}, '${u.username}', '${u.role}')" class="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors" title="แก้ไข"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
-                                    <button onclick="deleteUser(${u.id}, '${u.username}')" class="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors" title="ลบ"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
-                                    </div>`;
-                            return `<tr class="hover:bg-slate-50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-slate-500 font-mono">${u.id}</td>
-                        <td class="px-6 py-4 font-medium text-slate-800">${u.username}</td>
-                        <td class="px-6 py-4">${roleBadge}</td>
-                        <td class="px-6 py-4 text-center">${actions}</td>
-                    </tr>`;
-                        }).join('');
-                    });
-                }
-
-                document.getElementById('btnCreateUser').addEventListener('click', () => {
-                    document.getElementById('createUserForm').reset();
-                    document.getElementById('createUserModal').classList.remove('hidden');
-                });
-
-                document.getElementById('createUserForm').addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const username = document.getElementById('newUsername').value.trim();
-                    const password = document.getElementById('newPassword').value;
-                    const role = document.querySelector('input[name="newRole"]:checked').value;
-                    try {
-                        const res = await fetch('/api/admin/users', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username, password, role })
-                        });
-                        const result = await res.json();
-                        if (res.ok) {
-                            Swal.fire('สำเร็จ!', 'สร้างบัญชีผู้ใช้เรียบร้อย', 'success');
-                            document.getElementById('createUserModal').classList.add('hidden');
-                            loadUsers();
-                        } else {
-                            Swal.fire('ล้มเหลว', result.error, 'error');
-                        }
-                    } catch { Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง', 'error'); }
-                });
-
-                window.openEditUser = (id, username, role) => {
-                    document.getElementById('editUserId').value = id;
-                    document.getElementById('editUserUsername').value = username;
-                    document.getElementById('editUserPassword').value = '';
-                    const radioToCheck = document.querySelector(`input[name="editRole"][value="${role}"]`);
-                    if (radioToCheck) radioToCheck.checked = true;
-                    document.getElementById('editUserModal').classList.remove('hidden');
-                };
-
-                document.getElementById('editUserForm').addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const id = document.getElementById('editUserId').value;
-                    const role = document.querySelector('input[name="editRole"]:checked').value;
-                    const password = document.getElementById('editUserPassword').value;
-                    const payload = { role };
-                    if (password) payload.password = password;
-                    try {
-                        const res = await fetch(`/api/admin/users/${id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        const result = await res.json();
-                        if (res.ok) {
-                            Swal.fire('สำเร็จ!', 'อัปเดตบัญชีเรียบร้อย', 'success');
-                            document.getElementById('editUserModal').classList.add('hidden');
-                            loadUsers();
-                        } else {
-                            Swal.fire('ล้มเหลว', result.error, 'error');
-                        }
-                    } catch { Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง', 'error'); }
-                });
-
-                window.deleteUser = async (id, username) => {
-                    const conf = await Swal.fire({
-                        title: `ลบผู้ใช้ "${username}"?`,
-                        icon: 'warning', showCancelButton: true,
-                        confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b',
-                        confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก'
-                    });
-                    if (!conf.isConfirmed) return;
-                    const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
-                    if (res.ok) { loadUsers(); Swal.fire('ลบสำเร็จ!', '', 'success'); }
-                    else { const d = await res.json(); Swal.fire('ลบล้มเหลว', d.error, 'error'); }
-                };
-
-                // --- Init ---
                 document.addEventListener('DOMContentLoaded', () => {
                     loadStats();
-                    loadProducts();
-                    loadUsers();
                 });
             </script>
     </body>

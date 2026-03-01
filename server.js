@@ -50,14 +50,14 @@ const requireAuth = (req, res, next) => {
     }
 };
 
-const requireAdmin = (req, res, next) => {
-    if (req.session.user && req.session.user.role === 'admin') {
+const requireManager = (req, res, next) => {
+    if (req.session.user && req.session.user.role === 'manager') {
         next();
     } else {
         if (req.path.startsWith('/api')) {
-            return res.status(403).json({ error: 'ไม่มีสิทธิ์ผู้ดูแลระบบ (Admin required)' });
+            return res.status(403).json({ error: 'ไม่มีสิทธิ์ผู้ดูแลระบบ (Manager required)' });
         }
-        res.status(403).send('Forbidden: Admin access required');
+        res.status(403).send('Forbidden: Manager access required');
     }
 };
 
@@ -78,7 +78,9 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            role TEXT DEFAULT 'user'
+            full_name TEXT,
+            role TEXT DEFAULT 'staff',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`);
 
         // Products Table (Added shelf_life_days)
@@ -118,7 +120,7 @@ function initializeDatabase() {
             if (!err && row.count === 0) {
                 const salt = bcrypt.genSaltSync(10);
                 const hash = bcrypt.hashSync('1234', salt);
-                db.run(`INSERT INTO Users (username, password, role) VALUES ('admin', ?, 'admin')`, [hash]);
+                db.run(`INSERT INTO Users (username, password, role) VALUES ('admin', ?, 'manager')`, [hash]);
                 console.log("Seeded default Admin user (admin / 1234)");
             }
         });
@@ -141,6 +143,30 @@ function initializeDatabase() {
                     else console.log("Migration: Added extra_info column to Transactions_Log.");
                 });
             }
+        });
+
+        // Migration: add full_name and created_at to Users if missing
+        db.all("PRAGMA table_info(Users)", (err, cols) => {
+            if (!err && cols && !cols.find(c => c.name === 'full_name')) {
+                db.run("ALTER TABLE Users ADD COLUMN full_name TEXT", (alterErr) => {
+                    if (alterErr) console.error("Migration full_name failed:", alterErr);
+                    else console.log("Migration: Added full_name column to Users.");
+                });
+            }
+            if (!err && cols && !cols.find(c => c.name === 'created_at')) {
+                db.run("ALTER TABLE Users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP", (alterErr) => {
+                    if (alterErr) console.error("Migration created_at failed:", alterErr);
+                    else console.log("Migration: Added created_at column to Users.");
+                });
+            }
+        });
+
+        // Migration: Update roles from admin/user to manager/staff
+        db.run("UPDATE Users SET role = 'manager' WHERE role = 'admin'", (err) => {
+            if (!err) console.log("Migration: Updated old admin roles to manager.");
+        });
+        db.run("UPDATE Users SET role = 'staff' WHERE role = 'user'", (err) => {
+            if (!err) console.log("Migration: Updated old user roles to staff.");
         });
 
         // Seed Products if empty
@@ -318,12 +344,21 @@ app.get('/history', requireAuth, (req, res) => {
 // ==========================================
 // ROUTES - ADMIN VIEWS
 // ==========================================
-app.get('/admin', requireAdmin, (req, res) => {
+app.get('/admin', requireManager, (req, res) => {
     // Admin Dashboard Data
     res.render('admin_dashboard');
 });
 
-app.get('/admin/users', requireAdmin, (req, res) => {
+// Standalone Management Pages (Manager only)
+app.get('/manage-products', requireManager, (req, res) => {
+    res.render('manage_products', { activePage: 'manage_products', user: req.session.user });
+});
+
+app.get('/manage-users', requireManager, (req, res) => {
+    res.render('manage_users', { activePage: 'manage_users', user: req.session.user });
+});
+
+app.get('/admin/users', requireManager, (req, res) => {
     res.render('admin_users');
 });
 
@@ -333,6 +368,9 @@ app.get('/admin/users', requireAdmin, (req, res) => {
 // ==========================================
 
 app.get('/api/inventory', requireAuth, (req, res) => {
+    // Run auto-expire check in the background when inventory is requested
+    autoLogExpiredProducts();
+
     const query = `
         SELECT 
             p.id as product_id, 
@@ -352,17 +390,34 @@ app.get('/api/inventory', requireAuth, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
 
         const grouped = {};
+        const todayStr = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' }).split(' ')[0];
+
         for (const row of rows) {
             const { product_id, product_name, image_url, category_name, stock_id, receive_date, expiry_date, quantity } = row;
             if (!grouped[product_id]) {
-                grouped[product_id] = { id: product_id, product_name, image_url, category_name, total_quantity: 0, batches: [] };
+                grouped[product_id] = {
+                    id: product_id,
+                    product_name,
+                    image_url,
+                    category_name,
+                    total_quantity: 0,
+                    expired_quantity: 0,
+                    batches: []
+                };
             }
             if (stock_id) {
-                grouped[product_id].total_quantity += quantity;
-                grouped[product_id].batches.push({ stock_id, receive_date, expiry_date, quantity });
+                // Check if expired based on Bangkok time
+                const isExpired = expiry_date < todayStr;
+
+                if (isExpired) {
+                    grouped[product_id].expired_quantity += quantity;
+                } else {
+                    grouped[product_id].total_quantity += quantity;
+                }
+                grouped[product_id].batches.push({ stock_id, receive_date, expiry_date, quantity, isExpired });
             }
         }
-        res.json(Object.values(grouped).filter(p => p.total_quantity > 0 || p.batches.length === 0));
+        res.json(Object.values(grouped).filter(p => p.total_quantity > 0 || p.expired_quantity > 0 || p.batches.length === 0));
     });
 });
 
@@ -503,12 +558,7 @@ app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
         db.run('BEGIN TRANSACTION');
 
         const stmtDelete = db.prepare('DELETE FROM Stock WHERE id = ?');
-        const stmtLog = db.prepare(`
-            INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) 
-            VALUES ('EXPIRED', ?, ?, ?, ?, ?)
-        `);
 
-        const timestamp = getBangkokTimestamp();
         let errorOccurred = false;
 
         expired_batches.forEach(batch => {
@@ -516,16 +566,10 @@ app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
             stmtDelete.run([batch.stock_id], (err) => {
                 if (err) errorOccurred = true;
             });
-
-            // Log format requirement: "หมดวันไหน กี่จำนวน"
-            const extraInfo = `${batch.product_name} | หมดอายุ: ${batch.expiry_date}`;
-            stmtLog.run([batch.product_id, batch.quantity, req.session.user.username, timestamp, extraInfo], (err) => {
-                if (err) errorOccurred = true;
-            });
+            // EXPIRED logs are now created automatically, so we don't duplicate them here.
         });
 
         stmtDelete.finalize();
-        stmtLog.finalize();
 
         db.run('COMMIT', (err) => {
             if (err || errorOccurred) {
@@ -544,6 +588,7 @@ app.get('/api/history', requireAuth, (req, res) => {
                t.quantity, t.actor_name, t.extra_info
         FROM Transactions_Log t
         LEFT JOIN Products p ON t.product_id = p.id
+        WHERE t.action_type IN ('ADD', 'WITHDRAW', 'EXPIRED')
         ORDER BY t.action_date DESC
     `;
     db.all(query, [], (err, rows) => {
@@ -552,38 +597,150 @@ app.get('/api/history', requireAuth, (req, res) => {
     });
 });
 
+// ==========================================
+// Auto-Log Expired Products Logic
+// ==========================================
+function autoLogExpiredProducts(callback) {
+    db.serialize(() => {
+        // Find stock that is expired (expiry_date < today)
+        // and hasn't been logged in Transactions_Log as 'EXPIRED' for that specific stock_id (if we had stock_id, but we log by product_id and quantity).
+        // Since Transactions_Log doesn't track stock_id directly, we need to be careful.
+        // Let's add an explicit 'is_expired_logged' flag to Stock if possible, or use extra_info to store stock_id.
+        // Since we can't easily alter Stock schema synchronously here without risking issues, we will use a simpler approach:
+        // Match product_id and quantity and date in extra_info.
+
+        // Actually, the most robust way without schema change is to check if a log exists for that specific Stock ID inside extra_info.
+        // Let's ensure 'extra_info' contains the Stock ID when auto-logging.
+
+        const qFindExpired = `
+            SELECT s.id as stock_id, s.product_id, s.quantity, s.expiry_date, p.product_name 
+            FROM Stock s
+            JOIN Products p ON s.product_id = p.id
+            WHERE s.expiry_date < date('now', 'localtime') AND s.quantity > 0
+        `;
+
+        db.all(qFindExpired, [], (err, expiredRows) => {
+            if (err || !expiredRows || expiredRows.length === 0) {
+                if (callback) callback();
+                return;
+            }
+
+            // Check which ones are already logged
+            const qCheckLog = `SELECT extra_info FROM Transactions_Log WHERE action_type = 'EXPIRED' AND extra_info LIKE '%StockID:%'`;
+            db.all(qCheckLog, [], (err2, logRows) => {
+                const loggedStockIds = new Set();
+                if (!err2 && logRows) {
+                    logRows.forEach(row => {
+                        const match = row.extra_info.match(/StockID:(\d+)/);
+                        if (match) loggedStockIds.add(parseInt(match[1], 10));
+                    });
+                }
+
+                const toLog = expiredRows.filter(row => !loggedStockIds.has(row.stock_id));
+                if (toLog.length === 0) {
+                    if (callback) callback();
+                    return;
+                }
+
+                db.run('BEGIN TRANSACTION');
+                const stmtLog = db.prepare(`
+                    INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) 
+                    VALUES ('EXPIRED', ?, ?, 'System/Auto', ?, ?)
+                `);
+
+                const timestamp = getBangkokTimestamp();
+                let errorOccurred = false;
+
+                toLog.forEach(batch => {
+                    const extraInfo = `${batch.product_name} | หมดอายุ: ${batch.expiry_date} | StockID:${batch.stock_id}`;
+                    stmtLog.run([batch.product_id, batch.quantity, timestamp, extraInfo], (e) => {
+                        if (e) errorOccurred = true;
+                    });
+                });
+
+                stmtLog.finalize();
+                db.run('COMMIT', () => {
+                    if (callback) callback();
+                });
+            });
+        });
+    });
+}
+
 // Admin APIs
-app.get('/api/admin/dashboard-stats', requireAdmin, (req, res) => {
-    const stats = {};
+app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
+    // 5 KPIs List:
+    const qProducts = `SELECT COUNT(id) AS totalProducts FROM Products`;
+    // Only count active stock towards total stock!
+    const qStock = `SELECT SUM(quantity) AS totalStock FROM Stock WHERE quantity > 0 AND expiry_date >= date('now', 'localtime')`;
+    // Only count active stock towards total value!
+    const qValue = `SELECT SUM(s.quantity * p.price) AS totalValue 
+                    FROM Stock s
+                    JOIN Products p ON s.product_id = p.id
+                    WHERE s.quantity > 0 AND s.expiry_date >= date('now', 'localtime')`;
 
-    // Summary totals
-    db.get(`SELECT COUNT(*) as totalProducts FROM Products`, (err, row1) => {
-        stats.totalProducts = row1?.totalProducts || 0;
+    // Transactions
+    const qReceiveTx = `SELECT COUNT(id) AS totalReceiveTx FROM Transactions_Log WHERE action_type = 'ADD'`;
+    const qWithdrawTx = `SELECT COUNT(id) AS totalWithdrawTx FROM Transactions_Log WHERE action_type = 'WITHDRAW'`;
 
-        db.get(`SELECT SUM(quantity) as totalStock FROM Stock WHERE quantity > 0`, (err, row2) => {
-            stats.totalStock = row2?.totalStock || 0;
+    // Active Stock List (Under 50)
+    const qLowStock = `
+        SELECT p.id, p.product_name, SUM(s.quantity) AS total_qty
+        FROM Products p
+        JOIN Stock s ON p.id = s.product_id
+        WHERE s.quantity > 0 AND s.expiry_date >= date('now', 'localtime')
+        GROUP BY p.id
+        HAVING total_qty < 50
+        ORDER BY total_qty ASC
+        LIMIT 10
+    `;
 
-            db.get(`SELECT COUNT(*) as totalTx FROM Transactions_Log`, (err, row3) => {
-                stats.totalTx = row3?.totalTx || 0;
+    // Frequent Receive (Top 10)
+    const qFreqReceive = `
+        SELECT p.id, p.product_name, COUNT(t.id) as freq, SUM(t.quantity) as total_qty
+        FROM Transactions_Log t
+        JOIN Products p ON t.product_id = p.id
+        WHERE t.action_type = 'ADD'
+        GROUP BY p.id
+        ORDER BY freq DESC, total_qty DESC
+        LIMIT 10
+    `;
 
-                // Top 5 Sellers
-                db.all(`
-                    SELECT p.product_name, SUM(t.quantity) as total_sold
-                    FROM Transactions_Log t JOIN Products p ON t.product_id = p.id
-                    WHERE t.action_type = 'WITHDRAW'
-                    GROUP BY t.product_id ORDER BY total_sold DESC LIMIT 5
-                `, [], (err, top) => {
-                    stats.top5 = top || [];
+    // Frequent Withdraw (Top 10)
+    const qFreqWithdraw = `
+        SELECT p.id, p.product_name, COUNT(t.id) as freq, SUM(t.quantity) as total_qty
+        FROM Transactions_Log t
+        JOIN Products p ON t.product_id = p.id
+        WHERE t.action_type = 'WITHDRAW'
+        GROUP BY p.id
+        ORDER BY freq DESC, total_qty DESC
+        LIMIT 10
+    `;
 
-                    // Worst 5 Sellers
-                    db.all(`
-                        SELECT p.product_name, SUM(t.quantity) as total_sold
-                        FROM Transactions_Log t JOIN Products p ON t.product_id = p.id
-                        WHERE t.action_type = 'WITHDRAW'
-                        GROUP BY t.product_id ORDER BY total_sold ASC LIMIT 5
-                    `, [], (err, worst) => {
-                        stats.worst5 = worst || [];
-                        res.json(stats);
+    db.get(qProducts, [], (err1, row1) => {
+        db.get(qStock, [], (err2, row2) => {
+            db.get(qValue, [], (err3, row3) => {
+                db.get(qReceiveTx, [], (err4, row4) => {
+                    db.get(qWithdrawTx, [], (err5, row5) => {
+                        db.all(qLowStock, [], (err6, rows6) => {
+                            db.all(qFreqReceive, [], (err7, rows7) => {
+                                db.all(qFreqWithdraw, [], (err8, rows8) => {
+                                    if (err1 || err2 || err3 || err4 || err5 || err6 || err7 || err8) {
+                                        return res.status(500).json({ error: "Failed to load dashboard data" });
+                                    }
+                                    res.json({
+                                        totalProducts: row1?.totalProducts || 0,
+                                        totalStock: row2?.totalStock || 0,
+                                        totalValue: row3?.totalValue || 0,
+                                        totalReceiveTx: row4?.totalReceiveTx || 0,
+                                        totalWithdrawTx: row5?.totalWithdrawTx || 0,
+                                        lowStockList: rows6 || [],
+                                        frequentReceiveList: rows7 || [],
+                                        frequentWithdrawList: rows8 || []
+                                    });
+                                });
+                            });
+                        });
                     });
                 });
             });
@@ -591,8 +748,25 @@ app.get('/api/admin/dashboard-stats', requireAdmin, (req, res) => {
     });
 });
 
+app.get('/api/admin/system-logs', requireManager, (req, res) => {
+    const query = `
+        SELECT t.id, t.action_date, t.action_type,
+               COALESCE(p.product_name, '[ไม่มี]') AS product_name,
+               t.quantity, t.actor_name, t.extra_info
+        FROM Transactions_Log t
+        LEFT JOIN Products p ON t.product_id = p.id
+        WHERE t.action_type IN ('CREATE_USER', 'DELETE_USER', 'UPDATE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_PRODUCT')
+        ORDER BY t.action_date DESC
+        LIMIT 50
+    `;
+    db.all(query, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
 // Admin: Reseed all stock with random quantities
-app.post('/api/admin/reseed-stock', requireAdmin, (req, res) => {
+app.post('/api/admin/reseed-stock', requireManager, (req, res) => {
     db.serialize(() => {
         db.run('BEGIN TRANSACTION');
         db.run('DELETE FROM Stock', (err) => {
@@ -636,22 +810,22 @@ app.post('/api/admin/reseed-stock', requireAdmin, (req, res) => {
     });
 });
 
-app.get('/api/admin/users', requireAdmin, (req, res) => {
-    db.all("SELECT id, username, role FROM Users", [], (err, rows) => {
+app.get('/api/admin/users', requireManager, (req, res) => {
+    db.all("SELECT id, username, full_name, role, created_at FROM Users", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
-app.post('/api/admin/users', requireAdmin, (req, res) => {
-    const { username, password, role } = req.body;
-    if (!username || !password) return res.status(400).json({ error: "ใส่ข้อมูลให้ครบ (Missing fields)" });
+app.post('/api/admin/users', requireManager, (req, res) => {
+    const { username, password, full_name, role } = req.body;
+    if (!username || !password || !full_name) return res.status(400).json({ error: "ใส่ข้อมูลให้ครบ (Missing fields)" });
 
-    const uRole = role === 'admin' ? 'admin' : 'user';
+    const uRole = role === 'manager' ? 'manager' : 'staff';
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
 
-    db.run("INSERT INTO Users (username, password, role) VALUES (?, ?, ?)", [username, hash, uRole], function (err) {
+    db.run("INSERT INTO Users (username, password, full_name, role) VALUES (?, ?, ?, ?)", [username, hash, full_name, uRole], function (err) {
         if (err) return res.status(500).json({ error: "ชื่อผู้ใช้นี้มีอยู่แล้ว หรือเกิดข้อผิดพลาด (Username exists or DB error)" });
         const newUserId = this.lastID;
         db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) VALUES ('CREATE_USER', NULL, NULL, ?, ?, ?)`,
@@ -660,7 +834,7 @@ app.post('/api/admin/users', requireAdmin, (req, res) => {
     });
 });
 
-app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/users/:id', requireManager, (req, res) => {
     const id = req.params.id;
     // Prevent deleting self here
     if (id == req.session.user.id) return res.status(400).json({ error: "ไม่สามารถลบบัญชีตัวเองได้" });
@@ -676,7 +850,7 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
 });
 
 // Edit user role and/or password
-app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/users/:id', requireManager, (req, res) => {
     const id = req.params.id;
     const { role, password } = req.body;
     if (!role && !password) return res.status(400).json({ error: 'ไม่มีข้อมูลที่จะอัปเดต' });
@@ -686,7 +860,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
 
     if (role) {
         updates.push('role = ?');
-        params.push(role === 'admin' ? 'admin' : 'user');
+        params.push(role === 'manager' ? 'manager' : 'staff');
     }
     if (password) {
         const salt = bcrypt.genSaltSync(10);
@@ -708,7 +882,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
 // ==========================================
 
 // List all products (admin view with full details)
-app.get('/api/admin/products', requireAdmin, (req, res) => {
+app.get('/api/admin/products', requireManager, (req, res) => {
     db.all(`SELECT id, product_name, price, image_url, category_name, shelf_life_days FROM Products ORDER BY category_name ASC, product_name ASC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
@@ -716,7 +890,7 @@ app.get('/api/admin/products', requireAdmin, (req, res) => {
 });
 
 // Create new product
-app.post('/api/admin/products', requireAdmin, (req, res) => {
+app.post('/api/admin/products', requireManager, (req, res) => {
     const { product_name, price, image_url, category_name, shelf_life_days } = req.body;
     if (!product_name || !product_name.trim()) return res.status(400).json({ error: 'กรุณาใส่ชื่อสินค้า' });
 
@@ -734,7 +908,7 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
 });
 
 // Edit product
-app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/products/:id', requireManager, (req, res) => {
     const id = req.params.id;
     const { product_name, price, image_url, category_name, shelf_life_days } = req.body;
     if (!product_name || !product_name.trim()) return res.status(400).json({ error: 'กรุณาใส่ชื่อสินค้า' });
@@ -751,7 +925,7 @@ app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
 });
 
 // Delete product (cascade: delete its stock and transaction logs, but keep a DELETE_PRODUCT log)
-app.delete('/api/admin/products/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/products/:id', requireManager, (req, res) => {
     const id = req.params.id;
     db.get('SELECT product_name FROM Products WHERE id = ?', [id], (err, prod) => {
         if (err || !prod) return res.status(404).json({ error: 'ไม่พบสินค้า' });

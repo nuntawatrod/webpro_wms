@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="th">
+<%- include('layout/head') %>
+
+    <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+        <!-- Navbar -->
+        <%- include('layout/navbar', { activePage: 'manage_users' , user: locals.user }) %>
+
+            <!-- Main Content -->
+            <main class="flex-grow flex items-center justify-center p-4">
+
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100">
+
+                    <div class="bg-slate-50 px-8 py-6 border-b border-slate-100 text-center">
+                        <div
+                            class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+                                </path>
+                            </svg>
+                        </div>
+                        <h1 class="text-2xl font-bold text-slate-800">สร้างบัญชีผู้ใช้ใหม่</h1>
+                        <p class="text-sm text-slate-500 mt-1">เพิ่มข้อมูลบัญชีผู้ปฏิบัติงานหรือผู้จัดการลงในระบบ</p>
+                    </div>
+
+                    <form id="createUserForm" class="p-8 space-y-6">
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้ (Username) <span
+                                    class="text-rose-500">*</span></label>
+                            <input type="text" id="newUsername" required placeholder="สำหรับเข้าสู่ระบบ"
+                                class="w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all"
+                                autocomplete="off">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อ-นามสกุล (Full Name) <span
+                                    class="text-rose-500">*</span></label>
+                            <input type="text" id="newFullName" required placeholder="ชื่อ-นามสกุล ของผู้ใช้งาน"
+                                class="w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all"
+                                autocomplete="off">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">รหัสผ่าน (Password) <span
+                                    class="text-rose-500">*</span></label>
+                            <input type="password" id="newPassword" required placeholder="กำหนดรหัสผ่านเบื้องต้น"
+                                class="w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-3">บทบาท (Role) <span
+                                    class="text-rose-500">*</span></label>
+                            <div class="grid grid-cols-2 gap-4">
+                                <label
+                                    class="flex items-center text-sm cursor-pointer border border-slate-200 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+                                    <input type="radio" name="newRole" value="staff" checked
+                                        class="w-4 h-4 text-indigo-600 focus:ring-indigo-500 cursor-pointer mr-3">
+                                    <span class="font-medium text-slate-700">ผู้ปฏิบัติงาน (Staff)</span>
+                                </label>
+                                <label
+                                    class="flex items-center text-sm cursor-pointer border border-slate-200 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+                                    <input type="radio" name="newRole" value="manager"
+                                        class="w-4 h-4 text-indigo-600 focus:ring-indigo-500 cursor-pointer mr-3">
+                                    <span class="font-medium text-slate-700">ผู้จัดการ (Manager)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100 flex justify-end space-x-3 mt-8">
+                            <button type="button" onclick="document.getElementById('createUserForm').reset()"
+                                class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200">
+                                ล้างข้อมูล
+                            </button>
+                            <button type="submit"
+                                class="px-5 py-2.5 bg-indigo-600 rounded-lg text-sm font-medium text-white hover:bg-indigo-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                บันทึกข้อมูล
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </main>
+
+            <!-- Notification Area -->
+            <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+            <script>
+                const AUTH_USER = { username: "<%= locals.user ? locals.user.username : '' %>", role: "<%= locals.user ? locals.user.role : '' %>" };
+
+                document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+
+                    const username = document.getElementById('newUsername').value.trim();
+                    const full_name = document.getElementById('newFullName').value.trim();
+                    const password = document.getElementById('newPassword').value;
+                    const role = document.querySelector('input[name="newRole"]:checked').value;
+
+                    try {
+                        const res = await fetch('/api/admin/users', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username, full_name, password, role })
+                        });
+                        const result = await res.json();
+
+                        if (res.ok) {
+                            Swal.fire({
+                                title: 'สำเร็จ!',
+                                text: 'สร้างบัญชีผู้ใช้ใหม่เรียบร้อยแล้ว',
+                                icon: 'success',
+                                confirmButtonColor: '#4f46e5'
+                            }).then(() => {
+                                document.getElementById('createUserForm').reset();
+                            });
+                        } else {
+                            Swal.fire({
+                                title: 'ล้มเหลว',
+                                text: result.error,
+                                icon: 'error',
+                                confirmButtonColor: '#4f46e5'
+                            });
+                        }
+                    } catch (err) {
+                        Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง กรุณาลองใหม่', 'error');
+                    }
+                });
+            </script>
+            <script src="/js/main.js"></script>
+    </body>
+
+</html>
