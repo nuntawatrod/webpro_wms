@@ -262,7 +262,9 @@ function initDashboard() {
             });
 
             const card = document.createElement('div');
-            card.className = `product-card bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col relative ${isExpiringSoon ? 'border-rose-300 ring-1 ring-rose-300' : 'border-slate-200'}`;
+            // grey out when out of stock
+            const outOfStockClass = product.total_quantity === 0 ? 'bg-slate-100 opacity-60 grayscale' : '';
+            card.className = `product-card bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col relative ${isExpiringSoon ? 'border-rose-300 ring-1 ring-rose-300' : 'border-slate-200'} ${outOfStockClass}`;
 
             const badgeHTML = isExpiringSoon ?
                 `<div class="absolute top-3 right-3 bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center">
@@ -287,10 +289,10 @@ function initDashboard() {
                     <div class="mt-auto pt-4 border-t border-slate-100 flex justify-between items-end">
                         <div>
                             <p class="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">จำนวนคงเหลือ</p>
-                            <p class="text-2xl font-bold ${product.total_quantity === 0 ? 'text-rose-500' : 'text-emerald-600'}">${product.total_quantity}</p>
+                            <p class="text-2xl font-bold ${product.total_quantity === 0 ? 'text-slate-500' : 'text-emerald-600'}">${product.total_quantity}</p>
                         </div>
                         <div class="text-right">
-                            <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-500'}">
                                 ${product.total_quantity > 0 ? 'มีสินค้า' : 'สินค้าหมด'}
                             </span>
                         </div>
@@ -313,10 +315,14 @@ function initDashboard() {
 
             // Master Row — strong red background if any batch expires within 2 days
             const tr = document.createElement('tr');
-            tr.className = `transition-colors group border-b border-slate-100 ${isExpiringSoonOverall
-                ? 'bg-rose-100 hover:bg-rose-200'
-                : 'hover:bg-slate-50'
-                }`;
+            // apply grey style when out of stock, otherwise check expiry warnings
+            let trClasses = 'transition-colors group border-b border-slate-100';
+            if (product.total_quantity === 0) {
+                trClasses += ' bg-slate-100 hover:bg-slate-100/90 text-slate-400 opacity-60';
+            } else {
+                trClasses += isExpiringSoonOverall ? ' bg-rose-100 hover:bg-rose-200' : ' hover:bg-slate-50';
+            }
+            tr.className = trClasses;
 
             const imgCellHtml = product.image_url
                 ? `<img src="${product.image_url}" class="h-10 w-10 object-contain rounded bg-white border border-slate-200 p-0.5">`
@@ -328,9 +334,9 @@ function initDashboard() {
                     <div class="font-medium text-slate-800">${product.product_name}</div>
                     <div class="text-xs text-slate-500 mt-0.5"><span class="bg-slate-100 px-1.5 py-0.5 rounded mr-1">${product.category_name || 'ทั่วไป'}</span> ${product.batches.length} ล็อตการรับ</div>
                 </td>
-                <td class="px-6 py-4 text-right font-semibold ${product.total_quantity === 0 ? 'text-rose-500' : 'text-slate-800'}">${product.total_quantity}</td>
+                <td class="px-6 py-4 text-right font-semibold ${product.total_quantity === 0 ? 'text-slate-400' : 'text-slate-800'}">${product.total_quantity}</td>
                 <td class="px-6 py-4 text-center">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.total_quantity > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}">
                         ${product.total_quantity > 0 ? 'มีสินค้า' : 'หมด'}
                     </span>
                 </td>
