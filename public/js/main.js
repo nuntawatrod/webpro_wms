@@ -129,6 +129,103 @@ function showDeleteConfirmModal(message, onConfirm) {
     content.style.display = 'block';
 }
 
+function showLotDetailsModal(productId, inventoryData, showExpiredMode) {
+    const product = inventoryData.find(p => p.id === productId || p.id === parseInt(productId));
+    if (!product) return;
+
+    let overlay = document.getElementById('lotDetailsModalOverlay');
+    if (!overlay) return;
+
+    // Clone to remove all previous event listeners
+    const newOverlay = overlay.cloneNode(true);
+    overlay.parentNode.replaceChild(newOverlay, overlay);
+    overlay = newOverlay;
+
+    const titleEl = document.getElementById('lotDetailsModalTitle');
+    const subtitleEl = document.getElementById('lotDetailsModalSubtitle');
+    const bodyEl = document.getElementById('lotDetailsModalBody');
+    const content = document.getElementById('lotDetailsModalContent');
+
+    if (!titleEl || !subtitleEl || !bodyEl || !content) return;
+
+    titleEl.textContent = product.product_name;
+    subtitleEl.textContent = `หมวดหมู่: ${product.category_name || 'ทั่วไป'}`;
+
+    const filteredBatches = product.batches.filter(b => {
+        const d = getDaysRemaining(b.expiry_date);
+        if (d === null) return !showExpiredMode;
+        if (showExpiredMode) return d < 0;
+        return d >= 0;
+    });
+
+    if (filteredBatches.length === 0) {
+        bodyEl.innerHTML = '<p class="text-sm text-slate-500 text-center py-4">ไม่มีข้อมูลล็อตสินค้านี้</p>';
+    } else {
+        const sortedBatches = [...filteredBatches].sort((a, b) => new Date(a.receive_date) - new Date(b.receive_date));
+
+        let html = '';
+        sortedBatches.forEach(b => {
+            const daysRemaining = getDaysRemaining(b.expiry_date);
+            let daysText = '-';
+            let rowClass = 'bg-white border-slate-200';
+            let textClass = 'text-slate-600';
+
+            if (daysRemaining !== null) {
+                daysText = `${Math.abs(daysRemaining)} วัน`;
+                if (daysRemaining < 0) {
+                    daysText = `หมดอายุแล้ว (${Math.abs(daysRemaining)} วัน)`;
+                    rowClass = 'bg-rose-50 border-rose-200';
+                    textClass = 'text-rose-700 font-medium';
+                } else if (daysRemaining === 0) {
+                    daysText = `วันนี้`;
+                    rowClass = 'bg-rose-50 border-rose-200';
+                    textClass = 'text-rose-700 font-medium';
+                } else if (daysRemaining <= 2) {
+                    daysText = `ใกล้หมดอายุ (${daysRemaining} วัน)`;
+                    rowClass = 'bg-amber-50 border-amber-200';
+                    textClass = 'text-amber-700 font-medium';
+                }
+            }
+
+            html += `
+                <div class="p-3 rounded-lg border ${rowClass} flex justify-between items-center shadow-sm">
+                    <div>
+                        <div class="text-sm font-semibold text-slate-700 mb-0.5">รับเข้า: ${formatDate(b.receive_date)}</div>
+                        <div class="text-xs text-slate-500">วันหมดอายุ: ${formatDate(b.expiry_date)}</div>
+                        <div class="text-xs mt-1 ${textClass}">${daysText}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-mono text-lg font-bold text-emerald-600">${b.quantity}</div>
+                        <div class="text-xs text-slate-500">แพ็ค</div>
+                    </div>
+                </div>
+            `;
+        });
+        bodyEl.innerHTML = html;
+    }
+
+    // Add close handlers
+    const btnCloseTop = document.getElementById('btnCloseLotDetails');
+
+    function closeLotModal() {
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            content.style.display = 'none';
+            content.classList.remove('scale-95', 'opacity-0');
+        }, 150);
+    }
+
+    if (btnCloseTop) btnCloseTop.addEventListener('click', closeLotModal);
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeLotModal();
+    });
+
+    overlay.classList.remove('hidden');
+    content.style.display = 'flex';
+}
+
 
 // ============================================
 // DASHBOARD (/)
@@ -555,68 +652,6 @@ function initDashboard() {
                 </div>
             `;
 
-            // Append lot details container (hidden by default)
-            let batchesGridHtml = '';
-            if (product.batches.length > 0) {
-                const filteredBatches = product.batches.filter(b => {
-                    const d = getDaysRemaining(b.expiry_date);
-                    if (d === null) return !showExpiredMode;
-                    if (showExpiredMode) return d < 0;
-                    return d >= 0;
-                });
-
-                if (filteredBatches.length > 0) {
-                    const sortedBatches = [...filteredBatches].sort((a, b) => new Date(a.receive_date) - new Date(b.receive_date));
-                    batchesGridHtml = `
-                    <div class="hidden absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20 border-t border-slate-200 p-3 batch-grid-rows-${product.id}" style="max-height: 75%; overflow-y: auto;">
-                        <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
-                            <span class="text-xs font-semibold text-slate-600 uppercase tracking-wider">รายละเอียดล็อต</span>
-                            <button class="btn-contract-grid text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-full hover:bg-slate-100 transition-colors" data-id="${product.id}">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            </button>
-                        </div>
-                        <div class="space-y-2">
-                            ${sortedBatches.map(b => {
-                        const daysRemaining = getDaysRemaining(b.expiry_date);
-                        let daysText = '-';
-                        let rowClass = 'bg-white border-slate-200';
-                        let textClass = 'text-slate-600';
-
-                        if (daysRemaining !== null) {
-                            daysText = `${daysRemaining} วัน`;
-                            if (daysRemaining < 0) {
-                                daysText = `หมดอายุแล้ว (${Math.abs(daysRemaining)} วัน)`;
-                                rowClass = 'bg-rose-50 border-rose-200';
-                                textClass = 'text-rose-700 font-medium';
-                            } else if (daysRemaining === 0) {
-                                daysText = `วันนี้`;
-                                rowClass = 'bg-rose-50 border-rose-200';
-                                textClass = 'text-rose-700 font-medium';
-                            } else if (daysRemaining <= 2) {
-                                daysText = `ใกล้หมดอายุ (${daysRemaining} วัน)`;
-                                rowClass = 'bg-amber-50 border-amber-200';
-                                textClass = 'text-amber-700 font-medium';
-                            }
-                        }
-
-                        return `
-                            <div class="text-sm p-2 rounded border ${rowClass} flex justify-between items-center shadow-sm">
-                                <div>
-                                    <span class="block text-xs text-slate-500 mb-0.5">รับเข้า: ${formatDate(b.receive_date)}</span>
-                                    <span class="${textClass}">${daysText}</span>
-                                </div>
-                                <div class="text-right font-mono font-medium text-slate-700">
-                                    ${b.quantity} แพ็ค
-                                </div>
-                            </div>
-                            `;
-                    }).join('')}
-                    </div>
-                </div>`;
-                    card.innerHTML += batchesGridHtml;
-                }
-            }
-
             gridView.appendChild(card);
         });
 
@@ -654,26 +689,11 @@ function initDashboard() {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation(); // prevent clicking from firing multiple times if card is clicked
                 const id = e.currentTarget.dataset.id;
-                const targetRow = document.querySelector(`.batch-grid-rows-${id}`);
-
-                if (targetRow) {
-                    targetRow.classList.remove('hidden');
-                }
+                showLotDetailsModal(id, inventoryData, showExpiredMode);
             });
         });
 
-        // Event listener for grid card close button
-        document.querySelectorAll('.btn-contract-grid').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation(); // prevent clicking from propagating to card
-                const id = e.currentTarget.dataset.id;
-                const targetRow = document.querySelector(`.batch-grid-rows-${id}`);
 
-                if (targetRow) {
-                    targetRow.classList.add('hidden');
-                }
-            });
-        });
     }
 
     function renderTable(data) {
