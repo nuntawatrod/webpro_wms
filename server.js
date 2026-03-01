@@ -50,14 +50,14 @@ const requireAuth = (req, res, next) => {
     }
 };
 
-const requireAdmin = (req, res, next) => {
-    if (req.session.user && req.session.user.role === 'admin') {
+const requireManager = (req, res, next) => {
+    if (req.session.user && req.session.user.role === 'manager') {
         next();
     } else {
         if (req.path.startsWith('/api')) {
-            return res.status(403).json({ error: 'ไม่มีสิทธิ์ผู้ดูแลระบบ (Admin required)' });
+            return res.status(403).json({ error: 'ไม่มีสิทธิ์ผู้ดูแลระบบ (Manager required)' });
         }
-        res.status(403).send('Forbidden: Admin access required');
+        res.status(403).send('Forbidden: Manager access required');
     }
 };
 
@@ -78,7 +78,7 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            role TEXT DEFAULT 'user'
+            role TEXT DEFAULT 'staff'
         )`);
 
         // Products Table (Added shelf_life_days)
@@ -118,7 +118,7 @@ function initializeDatabase() {
             if (!err && row.count === 0) {
                 const salt = bcrypt.genSaltSync(10);
                 const hash = bcrypt.hashSync('1234', salt);
-                db.run(`INSERT INTO Users (username, password, role) VALUES ('admin', ?, 'admin')`, [hash]);
+                db.run(`INSERT INTO Users (username, password, role) VALUES ('admin', ?, 'manager')`, [hash]);
                 console.log("Seeded default Admin user (admin / 1234)");
             }
         });
@@ -141,6 +141,14 @@ function initializeDatabase() {
                     else console.log("Migration: Added extra_info column to Transactions_Log.");
                 });
             }
+        });
+
+        // Migration: Update roles from admin/user to manager/staff
+        db.run("UPDATE Users SET role = 'manager' WHERE role = 'admin'", (err) => {
+            if (!err) console.log("Migration: Updated old admin roles to manager.");
+        });
+        db.run("UPDATE Users SET role = 'staff' WHERE role = 'user'", (err) => {
+            if (!err) console.log("Migration: Updated old user roles to staff.");
         });
 
         // Seed Products if empty
@@ -318,12 +326,21 @@ app.get('/history', requireAuth, (req, res) => {
 // ==========================================
 // ROUTES - ADMIN VIEWS
 // ==========================================
-app.get('/admin', requireAdmin, (req, res) => {
+app.get('/admin', requireManager, (req, res) => {
     // Admin Dashboard Data
     res.render('admin_dashboard');
 });
 
-app.get('/admin/users', requireAdmin, (req, res) => {
+// Standalone Management Pages (Manager only)
+app.get('/manage-products', requireManager, (req, res) => {
+    res.render('manage_products', { activePage: 'manage_products', user: req.session.user });
+});
+
+app.get('/manage-users', requireManager, (req, res) => {
+    res.render('manage_users', { activePage: 'manage_users', user: req.session.user });
+});
+
+app.get('/admin/users', requireManager, (req, res) => {
     res.render('admin_users');
 });
 
@@ -651,7 +668,7 @@ app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
 });
 
 // Admin: Reseed all stock with random quantities
-app.post('/api/admin/reseed-stock', requireAdmin, (req, res) => {
+app.post('/api/admin/reseed-stock', requireManager, (req, res) => {
     db.serialize(() => {
         db.run('BEGIN TRANSACTION');
         db.run('DELETE FROM Stock', (err) => {
@@ -695,18 +712,18 @@ app.post('/api/admin/reseed-stock', requireAdmin, (req, res) => {
     });
 });
 
-app.get('/api/admin/users', requireAdmin, (req, res) => {
+app.get('/api/admin/users', requireManager, (req, res) => {
     db.all("SELECT id, username, role FROM Users", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
-app.post('/api/admin/users', requireAdmin, (req, res) => {
+app.post('/api/admin/users', requireManager, (req, res) => {
     const { username, password, role } = req.body;
     if (!username || !password) return res.status(400).json({ error: "ใส่ข้อมูลให้ครบ (Missing fields)" });
 
-    const uRole = role === 'admin' ? 'admin' : 'user';
+    const uRole = role === 'manager' ? 'manager' : 'staff';
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
 
@@ -719,7 +736,7 @@ app.post('/api/admin/users', requireAdmin, (req, res) => {
     });
 });
 
-app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/users/:id', requireManager, (req, res) => {
     const id = req.params.id;
     // Prevent deleting self here
     if (id == req.session.user.id) return res.status(400).json({ error: "ไม่สามารถลบบัญชีตัวเองได้" });
@@ -735,7 +752,7 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
 });
 
 // Edit user role and/or password
-app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/users/:id', requireManager, (req, res) => {
     const id = req.params.id;
     const { role, password } = req.body;
     if (!role && !password) return res.status(400).json({ error: 'ไม่มีข้อมูลที่จะอัปเดต' });
@@ -745,7 +762,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
 
     if (role) {
         updates.push('role = ?');
-        params.push(role === 'admin' ? 'admin' : 'user');
+        params.push(role === 'manager' ? 'manager' : 'staff');
     }
     if (password) {
         const salt = bcrypt.genSaltSync(10);
@@ -767,7 +784,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
 // ==========================================
 
 // List all products (admin view with full details)
-app.get('/api/admin/products', requireAdmin, (req, res) => {
+app.get('/api/admin/products', requireManager, (req, res) => {
     db.all(`SELECT id, product_name, price, image_url, category_name, shelf_life_days FROM Products ORDER BY category_name ASC, product_name ASC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
@@ -775,7 +792,7 @@ app.get('/api/admin/products', requireAdmin, (req, res) => {
 });
 
 // Create new product
-app.post('/api/admin/products', requireAdmin, (req, res) => {
+app.post('/api/admin/products', requireManager, (req, res) => {
     const { product_name, price, image_url, category_name, shelf_life_days } = req.body;
     if (!product_name || !product_name.trim()) return res.status(400).json({ error: 'กรุณาใส่ชื่อสินค้า' });
 
@@ -793,7 +810,7 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
 });
 
 // Edit product
-app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/products/:id', requireManager, (req, res) => {
     const id = req.params.id;
     const { product_name, price, image_url, category_name, shelf_life_days } = req.body;
     if (!product_name || !product_name.trim()) return res.status(400).json({ error: 'กรุณาใส่ชื่อสินค้า' });
@@ -810,7 +827,7 @@ app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
 });
 
 // Delete product (cascade: delete its stock and transaction logs, but keep a DELETE_PRODUCT log)
-app.delete('/api/admin/products/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/products/:id', requireManager, (req, res) => {
     const id = req.params.id;
     db.get('SELECT product_name FROM Products WHERE id = ?', [id], (err, prod) => {
         if (err || !prod) return res.status(404).json({ error: 'ไม่พบสินค้า' });

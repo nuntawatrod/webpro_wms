@@ -15,7 +15,7 @@
                 <!-- Transactions Dropdown -->
                 <div class="relative group">
                     <button
-                        class="<%= (locals.activePage === 'withdraw' || locals.activePage === 'add') ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors flex items-center gap-1">
+                        class="<%= (locals.activePage === 'withdraw' || locals.activePage === 'add' || locals.activePage === 'manage_products' || locals.activePage === 'manage_users') ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors flex items-center gap-1">
                         ทำรายการ
                         <svg class="w-4 h-4 text-slate-400 group-hover:text-emerald-500 transition-colors" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
@@ -43,13 +43,33 @@
                                 </svg>
                                 เบิกสินค้า
                             </a>
+                            <% if (user && user.role==='manager' ) { %>
+                                <div class="border-t border-slate-100 my-1"></div>
+                                <a href="/manage-products"
+                                    class="px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                    </svg>
+                                    จัดการสินค้า
+                                </a>
+                                <a href="/manage-users"
+                                    class="px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+                                        </path>
+                                    </svg>
+                                    จัดการผู้ใช้งาน
+                                </a>
+                                <% } %>
                         </div>
                     </div>
                 </div>
                 <a href="/history"
                     class="<%= locals.activePage === 'history' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">ประวัติ</a>
 
-                <% if (user && user.role==='admin' ) { %>
+                <% if (user && user.role==='manager' ) { %>
                     <a href="/admin"
                         class="<%= locals.activePage === 'admin' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">ผู้ดูแลระบบ</a>
                     <% } %>
