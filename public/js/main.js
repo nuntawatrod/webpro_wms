@@ -590,6 +590,7 @@ function initDashboard() {
             if (isExpired) cardBorderClass = 'border-slate-400 ring-1 ring-slate-400';
             else if (isDanger) cardBorderClass = 'border-rose-400 ring-1 ring-rose-400';
             else if (isWarning) cardBorderClass = 'border-amber-400 ring-1 ring-amber-400';
+            else cardBorderClass = 'border-gray-400 ring-1 ring-gray-400 opacity;-80';
 
             const card = document.createElement('div');
             card.className = `product-card bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col relative ${cardBorderClass}`;
