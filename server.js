@@ -751,6 +751,17 @@ app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
         LIMIT 10
     `;
 
+    // Category Distribution for Donut Chart (all stock with quantity > 0)
+    const qCategoryDist = `
+        SELECT p.category_name, SUM(s.quantity) as total
+        FROM Products p
+        JOIN Stock s ON p.id = s.product_id
+        WHERE s.quantity > 0
+        GROUP BY p.category_name
+        ORDER BY total DESC
+        LIMIT 5
+    `;
+
     db.get(qProducts, [], (err1, row1) => {
         db.all(qLowStockCount, [], (err2, rows2) => {
             db.get(qCategories, [], (err3, row3) => {
@@ -759,18 +770,21 @@ app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
                         db.all(qLowStock, [], (err6, rows6) => {
                             db.all(qFreqReceive, [], (err7, rows7) => {
                                 db.all(qFreqWithdraw, [], (err8, rows8) => {
-                                    if (err1 || err2 || err3 || err4 || err5 || err6 || err7 || err8) {
-                                        return res.status(500).json({ error: "Failed to load dashboard data" });
-                                    }
-                                    res.json({
-                                        totalProducts: row1?.totalProducts || 0,
-                                        lowStockCount: rows2 ? rows2.length : 0,
-                                        categoriesCount: row3?.categoriesCount || 0,
-                                        totalValue: row4?.totalValue || 0,
-                                        totalUsers: row5?.totalUsers || 0,
-                                        lowStockList: rows6 || [],
-                                        frequentReceiveList: rows7 || [],
-                                        frequentWithdrawList: rows8 || []
+                                    db.all(qCategoryDist, [], (err9, rows9) => {
+                                        if (err1 || err2 || err3 || err4 || err5 || err6 || err7 || err8 || err9) {
+                                            return res.status(500).json({ error: "Failed to load dashboard data" });
+                                        }
+                                        res.json({
+                                            totalProducts: row1?.totalProducts || 0,
+                                            lowStockCount: rows2 ? rows2.length : 0,
+                                            categoriesCount: row3?.categoriesCount || 0,
+                                            totalValue: row4?.totalValue || 0,
+                                            totalUsers: row5?.totalUsers || 0,
+                                            lowStockList: rows6 || [],
+                                            frequentReceiveList: rows7 || [],
+                                            frequentWithdrawList: rows8 || [],
+                                            categoryDistribution: rows9 || []
+                                        });
                                     });
                                 });
                             });

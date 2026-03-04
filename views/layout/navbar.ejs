@@ -1,91 +1,149 @@
-<!-- Navbar Component -->
-<nav class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-            <div class="flex items-center">
-                <span
-                    class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500 hidden sm:block">ระบบจัดการคลังสินค้าอาหารสดและอาหาร</span>
-                <span
-                    class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500 sm:hidden">WMS</span>
-            </div>
-            <div class="flex items-center space-x-4 sm:space-x-8">
-                <a href="/"
-                    class="<%= locals.activePage === 'dashboard' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">หน้าหลัก</a>
+<!-- Sidebar Navigation Component -->
+<aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
 
-                <!-- Transactions Dropdown -->
-                <div class="relative group">
-                    <button
-                        class="<%= (locals.activePage === 'withdraw' || locals.activePage === 'add' || locals.activePage === 'manage_products' || locals.activePage === 'manage_users') ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors flex items-center gap-1">
-                        ทำรายการ
-                        <svg class="w-4 h-4 text-slate-400 group-hover:text-emerald-500 transition-colors" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
-                            </path>
-                        </svg>
-                    </button>
-                    <!-- Dropdown Menu -->
-                    <div
-                        class="absolute left-0 mt-0 w-48 bg-white border border-slate-200 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:mt-1 transition-all duration-200 overflow-hidden z-50">
-                        <div class="py-1">
-                            <a href="/add-stock"
-                                class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 4v16m8-8H4"></path>
-                                </svg>
-                                เพิ่มสต็อก
-                            </a>
-                            <a href="/withdraw"
-                                class="px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M20 12H4M10 6L4 12L10 18"></path>
-                                </svg>
-                                เบิกสินค้า
-                            </a>
-                            <% if (user && user.role==='manager' ) { %>
-                                <div class="border-t border-slate-100 my-1"></div>
-                                <a href="/manage-products"
-                                    class="px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                    </svg>
-                                    จัดการสินค้า
-                                </a>
-                                <a href="/manage-users"
-                                    class="px-4 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
-                                        </path>
-                                    </svg>
-                                    จัดการผู้ใช้งาน
-                                </a>
-                                <% } %>
-                        </div>
-                    </div>
+        <!-- Logo / Brand -->
+        <div class="px-5 pt-6 pb-4">
+            <div class="flex items-center gap-2.5">
+                <div
+                    class="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
                 </div>
-                <a href="/history"
-                    class="<%= locals.activePage === 'history' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">ประวัติ</a>
-
-                <% if (user && user.role==='manager' ) { %>
-                    <a href="/admin"
-                        class="<%= locals.activePage === 'admin' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:border-b-2 hover:border-slate-300' %> px-1 py-5 text-sm font-medium transition-colors">ผู้ดูแลระบบ</a>
-                    <% } %>
-
-                        <form action="/logout" method="POST" class="ml-4 pl-4 border-l border-slate-200 py-3 block">
-                            <button type="submit"
-                                class="text-sm font-medium text-rose-500 hover:text-rose-700 focus:outline-none flex items-center gap-1">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
-                                    </path>
-                                </svg>
-                                ออกจากระบบ
-                            </button>
-                        </form>
+                <div>
+                    <p class="text-sm font-bold text-slate-800 leading-tight">Fresh WMS</p>
+                    <p class="text-[9px] font-semibold text-slate-400 tracking-widest leading-tight uppercase">Warehouse
+                    </p>
+                </div>
             </div>
         </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 px-3 space-y-0.5 pb-4">
+            <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Main Menu</p>
+            <a href="/" class="sidebar-link <%= locals.activePage === 'dashboard' ? 'active' : '' %>">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z">
+                    </path>
+                </svg>
+                <span>คลังสินค้า</span>
+            </a>
+
+            <a href="/add-stock" class="sidebar-link <%= locals.activePage === 'add' ? 'active' : '' %>">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                <span>เพิ่มสต็อก</span>
+            </a>
+
+            <a href="/withdraw" class="sidebar-link <%= locals.activePage === 'withdraw' ? 'active' : '' %>">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4m7-7l-7 7 7 7">
+                    </path>
+                </svg>
+                <span>เบิกสินค้า</span>
+            </a>
+
+            <a href="/history" class="sidebar-link <%= locals.activePage === 'history' ? 'active' : '' %>">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>ประวัติ</span>
+            </a>
+
+            <% if (user && user.role==='manager' ) { %>
+                <div class="pt-4">
+                    <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Admin</p>
+
+                    <a href="/admin" class="sidebar-link <%= locals.activePage === 'admin' ? 'active' : '' %>">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                            </path>
+                        </svg>
+                        <span>แดชบอร์ด</span>
+                    </a>
+
+                    <a href="/manage-products"
+                        class="sidebar-link <%= locals.activePage === 'manage_products' ? 'active' : '' %>">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                        <span>จัดการสินค้า</span>
+                    </a>
+
+                    <a href="/manage-users"
+                        class="sidebar-link <%= locals.activePage === 'manage_users' ? 'active' : '' %>">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+                            </path>
+                        </svg>
+                        <span>จัดการผู้ใช้</span>
+                    </a>
+                </div>
+                <% } %>
+        </nav>
+
+        <!-- User Footer -->
+        <div class="mx-3 mb-4 p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <div class="flex items-center gap-2.5 mb-2.5">
+                <div
+                    class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    <%= user ? user.username.charAt(0).toUpperCase() : '?' %>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-slate-700 truncate leading-tight">
+                        <%= user ? user.username : 'Guest' %>
+                    </p>
+                    <p class="text-[10px] text-slate-400 font-medium">
+                        <%= user && user.role==='manager' ? 'Manager' : 'Staff' %>
+                    </p>
+                </div>
+            </div>
+            <form action="/logout" method="POST">
+                <button type="submit"
+                    class="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                        </path>
+                    </svg>
+                    ออกจากระบบ
+                </button>
+            </form>
+        </div>
     </div>
-</nav>
+</aside>
+
+<!-- Mobile toggle -->
+<button id="sidebarToggle"
+    class="fixed top-4 left-4 z-50 lg:hidden bg-white p-2 rounded-xl shadow-md border border-slate-200 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition-colors">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+    </svg>
+</button>
+<div id="sidebarOverlay" class="sidebar-overlay hidden"></div>
+
+<script>
+    (function () {
+        var toggle = document.getElementById('sidebarToggle');
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (toggle && sidebar && overlay) {
+            toggle.addEventListener('click', function () {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('hidden');
+            });
+            overlay.addEventListener('click', function () {
+                sidebar.classList.remove('open');
+                overlay.classList.add('hidden');
+            });
+        }
+    })();
+</script>
