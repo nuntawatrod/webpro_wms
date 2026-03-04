@@ -164,6 +164,7 @@ function initializeDatabase() {
                     else console.log("Migration: Added extra_info column to Transactions_Log.");
                 });
             }
+            // Removed deleted_product_name migration as we are using extra_info instead
         });
 
         // Migration: add full_name and created_at to Users if missing
@@ -608,7 +609,12 @@ app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
 app.get('/api/history', requireAuth, (req, res) => {
     const query = `
         SELECT t.id, t.action_date, t.action_type,
-               COALESCE(p.product_name, '[สินค้าที่ถูกลบ]') AS product_name,
+               CASE
+                   WHEN p.product_name IS NOT NULL THEN p.product_name
+                   WHEN t.action_type IN ('ADD', 'WITHDRAW') AND t.extra_info IS NOT NULL AND t.extra_info != '' THEN t.extra_info
+                   WHEN t.action_type = 'EXPIRED' AND t.extra_info IS NOT NULL THEN SUBSTR(t.extra_info, 1, INSTR(t.extra_info, ' |') - 1)
+                   ELSE '[สินค้าที่ถูกลบ]'
+               END AS product_name,
                t.quantity, t.actor_name, t.extra_info
         FROM Transactions_Log t
         LEFT JOIN Products p ON t.product_id = p.id
@@ -695,17 +701,21 @@ function autoLogExpiredProducts(callback) {
 app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
     // 5 KPIs List:
     const qProducts = `SELECT COUNT(id) AS totalProducts FROM Products`;
-    // Only count active stock towards total stock!
-    const qStock = `SELECT SUM(quantity) AS totalStock FROM Stock WHERE quantity > 0 AND expiry_date >= date('now', 'localtime')`;
+    const qLowStockCount = `
+        SELECT p.id
+        FROM Products p
+        JOIN Stock s ON p.id = s.product_id
+        WHERE s.quantity > 0 AND s.expiry_date >= date('now', 'localtime')
+        GROUP BY p.id
+        HAVING SUM(s.quantity) < 50
+    `;
+    const qCategories = `SELECT COUNT(DISTINCT category_name) AS categoriesCount FROM Products`;
     // Only count active stock towards total value!
     const qValue = `SELECT SUM(s.quantity * p.price) AS totalValue 
                     FROM Stock s
                     JOIN Products p ON s.product_id = p.id
                     WHERE s.quantity > 0 AND s.expiry_date >= date('now', 'localtime')`;
-
-    // Transactions
-    const qReceiveTx = `SELECT COUNT(id) AS totalReceiveTx FROM Transactions_Log WHERE action_type = 'ADD'`;
-    const qWithdrawTx = `SELECT COUNT(id) AS totalWithdrawTx FROM Transactions_Log WHERE action_type = 'WITHDRAW'`;
+    const qUsers = `SELECT COUNT(id) AS totalUsers FROM Users`;
 
     // Active Stock List (Under 50)
     const qLowStock = `
@@ -742,10 +752,10 @@ app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
     `;
 
     db.get(qProducts, [], (err1, row1) => {
-        db.get(qStock, [], (err2, row2) => {
-            db.get(qValue, [], (err3, row3) => {
-                db.get(qReceiveTx, [], (err4, row4) => {
-                    db.get(qWithdrawTx, [], (err5, row5) => {
+        db.all(qLowStockCount, [], (err2, rows2) => {
+            db.get(qCategories, [], (err3, row3) => {
+                db.get(qValue, [], (err4, row4) => {
+                    db.get(qUsers, [], (err5, row5) => {
                         db.all(qLowStock, [], (err6, rows6) => {
                             db.all(qFreqReceive, [], (err7, rows7) => {
                                 db.all(qFreqWithdraw, [], (err8, rows8) => {
@@ -754,10 +764,10 @@ app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
                                     }
                                     res.json({
                                         totalProducts: row1?.totalProducts || 0,
-                                        totalStock: row2?.totalStock || 0,
-                                        totalValue: row3?.totalValue || 0,
-                                        totalReceiveTx: row4?.totalReceiveTx || 0,
-                                        totalWithdrawTx: row5?.totalWithdrawTx || 0,
+                                        lowStockCount: rows2 ? rows2.length : 0,
+                                        categoriesCount: row3?.categoriesCount || 0,
+                                        totalValue: row4?.totalValue || 0,
+                                        totalUsers: row5?.totalUsers || 0,
                                         lowStockList: rows6 || [],
                                         frequentReceiveList: rows7 || [],
                                         frequentWithdrawList: rows8 || []
@@ -948,27 +958,40 @@ app.put('/api/admin/products/:id', requireManager, (req, res) => {
     );
 });
 
-// Delete product (cascade: delete its stock and transaction logs, but keep a DELETE_PRODUCT log)
+// Delete product (prevent deletion if stock > 0, otherwise delete and log)
 app.delete('/api/admin/products/:id', requireManager, (req, res) => {
     const id = req.params.id;
     db.get('SELECT product_name FROM Products WHERE id = ?', [id], (err, prod) => {
         if (err || !prod) return res.status(404).json({ error: 'ไม่พบสินค้า' });
         const deletedName = prod.product_name;
-        db.serialize(() => {
-            db.run('BEGIN TRANSACTION');
-            db.run('DELETE FROM Stock WHERE product_id = ?', [id], (err) => {
-                if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสต็อกล้มเหลว' }); }
-                // Nullify product_id in log so history remains, but remove link
-                db.run('UPDATE Transactions_Log SET product_id = NULL WHERE product_id = ?', [id], (err2) => {
-                    if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: 'อัปเดตประวัติล้มเหลว' }); }
-                    db.run('DELETE FROM Products WHERE id = ?', [id], function (err3) {
-                        if (err3) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสินค้าล้มเหลว' }); }
-                        if (this.changes === 0) { db.run('ROLLBACK'); return res.status(404).json({ error: 'ไม่พบสินค้า' }); }
-                        // Insert DELETE_PRODUCT log after commit
-                        db.run('COMMIT', () => {
-                            db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) VALUES ('DELETE_PRODUCT', NULL, NULL, ?, ?, ?)`,
-                                [req.session.user.username, getBangkokTimestamp(), deletedName]);
-                            res.json({ message: 'ลบสินค้าสำเร็จ' });
+
+        // Check active stock
+        db.get('SELECT SUM(quantity) as total_qty FROM Stock WHERE product_id = ? AND quantity > 0', [id], (err, stockRow) => {
+            if (err) return res.status(500).json({ error: 'เกิดข้อผิดพลาดในการตรวจสอบสต็อก' });
+            if (stockRow && stockRow.total_qty > 0) {
+                return res.status(400).json({ error: 'ไม่สามารถลบได้ เนื่องจากยังมีสินค้าอยู่ในสต็อก กรุณาเบิกออกให้หมดก่อนลบรายการสินค้านี้' });
+            }
+
+            db.serialize(() => {
+                db.run('BEGIN TRANSACTION');
+                db.run('DELETE FROM Stock WHERE product_id = ?', [id], (err) => {
+                    if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสต็อกล้มเหลว' }); }
+                    // Store product_name in extra_info (only if it's currently null or empty, to not overwrite EXPIRED logs which already have it)
+                    // and nullify product_id in log so history remains, but remove link
+                    db.run(`UPDATE Transactions_Log 
+                            SET extra_info = CASE WHEN extra_info IS NULL OR extra_info = '' THEN ? ELSE extra_info END,
+                                product_id = NULL 
+                            WHERE product_id = ?`, [deletedName, id], (err2) => {
+                        if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: 'อัปเดตประวัติล้มเหลว' }); }
+                        db.run('DELETE FROM Products WHERE id = ?', [id], function (err3) {
+                            if (err3) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ลบสินค้าล้มเหลว' }); }
+                            if (this.changes === 0) { db.run('ROLLBACK'); return res.status(404).json({ error: 'ไม่พบสินค้า' }); }
+                            // Insert DELETE_PRODUCT log after commit
+                            db.run('COMMIT', () => {
+                                db.run(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info) VALUES ('DELETE_PRODUCT', NULL, NULL, ?, ?, ?)`,
+                                    [req.session.user.username, getBangkokTimestamp(), deletedName]);
+                                res.json({ message: 'ลบสินค้าสำเร็จ' });
+                            });
                         });
                     });
                 });
