@@ -376,7 +376,13 @@ app.get('/admin', requireManager, (req, res) => {
 
 // Standalone Management Pages (Manager only)
 app.get('/manage-products', requireManager, (req, res) => {
-    res.render('manage_products', { activePage: 'manage_products', user: req.session.user });
+    let tab = req.query.tab || 'add';
+    if (!['add', 'edit', 'delete'].includes(tab)) tab = 'add';
+
+    res.render('manage_products', {
+        activePage: `manage_products_${tab}`,
+        user: req.session.user
+    });
 });
 
 app.get('/manage-users', requireManager, (req, res) => {

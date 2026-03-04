@@ -253,7 +253,7 @@ function initDashboard() {
     let currentView = 'grid'; // default
     let currentSearch = '';
     let currentCategory = 'all';
-    let currentSort = 'qty-asc';
+    let currentSort = 'expiry-asc';
     let currentPage = 1;
     let showExpiredMode = false;
     const PAGE_SIZE = 40;

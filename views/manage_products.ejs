@@ -10,22 +10,7 @@
             <!-- Main Content -->
             <main class="main-content flex flex-col items-center justify-center p-4 min-h-screen">
 
-                <!-- Mode Switcher -->
-                <div class="mb-6 bg-white p-1 rounded-xl shadow-sm border border-slate-200 inline-flex gap-1">
-                    <button id="tabAdd"
-                        class="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all bg-emerald-600 text-white shadow-sm focus:outline-none">
-                        เพิ่มสินค้าใหม่
-                    </button>
-                    <button id="tabEdit"
-                        class="px-6 py-2.5 rounded-lg text-sm font-medium transition-all bg-transparent text-slate-500 hover:text-slate-800 focus:outline-none">
-                        แก้ไขสินค้า
-                    </button>
-                    <button id="tabDelete"
-                        class="px-6 py-2.5 rounded-lg text-sm font-medium transition-all bg-transparent text-slate-500 hover:text-slate-800 focus:outline-none">
-                        ลบสินค้า
-                    </button>
-                </div>
-
+                <!-- Removed Mode Switcher; now controlled via Sidebar sub-menu -->
                 <div
                     class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100 relative min-h-[500px]">
 
@@ -306,27 +291,31 @@
             <script>
                 const AUTH_USER = { username: "<%= locals.user ? locals.user.username : '' %>", role: "<%= locals.user ? locals.user.role : '' %>" };
 
-                // --- UI Switcher ---
-                const tabAdd = document.getElementById('tabAdd');
-                const tabEdit = document.getElementById('tabEdit');
-                const tabDelete = document.getElementById('tabDelete');
+                // --- UI Switcher (URL Based) ---
                 const viewAdd = document.getElementById('viewAdd');
                 const viewEdit = document.getElementById('viewEdit');
                 const viewDelete = document.getElementById('viewDelete');
 
-                function setActiveTab(active) {
-                    [tabAdd, tabEdit, tabDelete].forEach(t => {
-                        t.className = 'px-6 py-2.5 rounded-lg text-sm font-medium transition-all bg-transparent text-slate-500 hover:text-slate-800 focus:outline-none';
-                    });
-                    active.className = 'px-6 py-2.5 rounded-lg text-sm font-semibold transition-all bg-emerald-600 text-white shadow-sm focus:outline-none';
-                    if (active === tabDelete) active.className = 'px-6 py-2.5 rounded-lg text-sm font-semibold transition-all bg-rose-600 text-white shadow-sm focus:outline-none';
-                    if (active === tabEdit) active.className = 'px-6 py-2.5 rounded-lg text-sm font-semibold transition-all bg-blue-600 text-white shadow-sm focus:outline-none';
-                    [viewAdd, viewEdit, viewDelete].forEach(v => v.classList.add('hidden'));
+                const activeTab = '<%= locals.activePage %>'.replace('manage_products_', '');
+
+                function initView() {
+                    // Hide all first
+                    viewAdd.classList.add('hidden');
+                    viewEdit.classList.add('hidden');
+                    viewDelete.classList.add('hidden');
+
+                    if (activeTab === 'edit') {
+                        viewEdit.classList.remove('hidden');
+                        fetchProductsForEdit();
+                    } else if (activeTab === 'delete') {
+                        viewDelete.classList.remove('hidden');
+                        fetchProductsForDelete();
+                    } else {
+                        viewAdd.classList.remove('hidden');
+                    }
                 }
 
-                tabAdd.addEventListener('click', () => { setActiveTab(tabAdd); viewAdd.classList.remove('hidden'); });
-                tabEdit.addEventListener('click', () => { setActiveTab(tabEdit); viewEdit.classList.remove('hidden'); fetchProductsForEdit(); });
-                tabDelete.addEventListener('click', () => { setActiveTab(tabDelete); viewDelete.classList.remove('hidden'); fetchProductsForDelete(); });
+                document.addEventListener('DOMContentLoaded', initView);
 
                 // --- Add Logic ---
                 document.getElementById('createProductForm').addEventListener('submit', async (e) => {
