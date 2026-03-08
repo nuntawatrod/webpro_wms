@@ -100,6 +100,26 @@ function initProductManagement() {
         });
     }
 
+    // Add event listener for Edit search input
+    const editSearchInput = document.getElementById('editSearchInput');
+    if (editSearchInput) {
+        editSearchInput.addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            const filtered = masterEditProducts.filter(p => p.product_name.toLowerCase().includes(val));
+            renderEditSearchOptions(filtered);
+            document.getElementById('editSearchResults').classList.remove('hidden');
+        });
+    }
+
+    // Add event listener to show edit results when input is focused
+    if (editSearchInput) {
+        editSearchInput.addEventListener('focus', () => {
+            if (masterEditProducts.length > 0) {
+                document.getElementById('editSearchResults').classList.remove('hidden');
+            }
+        });
+    }
+
     // DELETE - fetch & render
     async function fetchProductsForDelete() {
         if (masterDeleteProducts.length > 0) return;
@@ -186,6 +206,48 @@ function initProductManagement() {
         const filtered = masterDeleteProducts.filter(p => p.product_name.toLowerCase().includes(val));
         renderDeleteSearchOptions(filtered);
         searchResults.classList.remove('hidden');
+    });
+
+    // EDIT - submit event
+    document.getElementById('editProductForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editProductId').value;
+        const product_name = document.getElementById('editProductName').value.trim();
+        const category_name = document.getElementById('editProductCategory').value;
+        const price = parseFloat(document.getElementById('editProductPrice').value);
+        const shelf_life_days = parseInt(document.getElementById('editProductShelfLife').value, 10);
+        const image_url = document.getElementById('editProductImageUrl').value.trim();
+        
+        try {
+            const res = await fetch(`/api/admin/products/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_name, category_name, price, shelf_life_days, image_url })
+            });
+            const result = await res.json();
+            if (res.ok) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('สำเร็จ', 'บันทึกการแก้ไขสินค้าเรียบร้อยแล้ว', 'success');
+                } else if (typeof showToast === 'function') {
+                    showToast('บันทึกการแก้ไขสินค้าเรียบร้อยแล้ว', 'success');
+                }
+                document.getElementById('editSearchInput').value = '';
+                document.getElementById('editProductForm').classList.add('hidden');
+                masterEditProducts = [];
+                masterDeleteProducts = [];
+            } else {
+                if (typeof showToast === 'function') showToast(result.error || 'บันทึกล้มเหลว', 'error');
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('ระบบขัดข้อง กรุณาลองใหม่', 'error');
+        }
+    });
+
+    // EDIT - cancel button
+    document.getElementById('btnCancelEdit')?.addEventListener('click', () => {
+        document.getElementById('editSearchInput').value = '';
+        document.getElementById('editProductForm').classList.add('hidden');
+        document.getElementById('editSearchResults').innerHTML = '';
     });
 
     document.addEventListener('click', (e) => {
