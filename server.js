@@ -690,18 +690,30 @@ app.post('/api/stock/delete-expired', hasPermission('delete_expired'), (req, res
         db.run('BEGIN TRANSACTION');
 
         const stmtDelete = db.prepare('DELETE FROM Stock WHERE id = ?');
+        const stmtLog = db.prepare(
+            `INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info)
+             VALUES ('EXPIRED', ?, ?, ?, ?, ?)`
+        );
 
         let errorOccurred = false;
+        const actorName = req.session.user ? (req.session.user.full_name || req.session.user.username) : 'Unknown';
+        const timestamp = getBangkokTimestamp();
 
         expired_batches.forEach(batch => {
             // batch = { stock_id, product_id, quantity, expiry_date, product_name }
             stmtDelete.run([batch.stock_id], (err) => {
                 if (err) errorOccurred = true;
             });
-            // EXPIRED logs are now created automatically, so we don't duplicate them here.
+
+            // log the manual deletion as an EXPIRED action so it's recorded immediately
+            const info = `Manual delete${category ? ' (' + category + ')' : ''} | StockID:${batch.stock_id}`;
+            stmtLog.run([batch.product_id, batch.quantity || 0, actorName, timestamp, info], (err) => {
+                if (err) errorOccurred = true;
+            });
         });
 
         stmtDelete.finalize();
+        stmtLog.finalize();
 
         db.run('COMMIT', (err) => {
             if (err || errorOccurred) {
@@ -1077,15 +1089,49 @@ app.put('/api/admin/products/:id', requireManager, (req, res) => {
     const { product_name, price, image_url, category_name, shelf_life_days } = req.body;
     if (!product_name || !product_name.trim()) return res.status(400).json({ error: 'กรุณาใส่ชื่อสินค้า' });
 
-    db.run(
-        `UPDATE Products SET product_name = ?, price = ?, image_url = ?, category_name = ?, shelf_life_days = ? WHERE id = ?`,
-        [product_name.trim(), parseFloat(price) || 0, (image_url || '').trim(), (category_name || 'ทั่วไป').trim(), parseInt(shelf_life_days) || 7, id],
-        function (err) {
-            if (err) return res.status(500).json({ error: 'อัปเดตสินค้าล้มเหลว: ' + err.message });
-            if (this.changes === 0) return res.status(404).json({ error: 'ไม่พบสินค้า' });
-            res.json({ message: 'อัปเดตสินค้าสำเร็จ' });
-        }
-    );
+    // fetch existing row to build change summary
+    db.get('SELECT * FROM Products WHERE id = ?', [id], (err, old) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!old) return res.status(404).json({ error: 'ไม่พบสินค้า' });
+
+        db.run(
+            `UPDATE Products SET product_name = ?, price = ?, image_url = ?, category_name = ?, shelf_life_days = ? WHERE id = ?`,
+            [product_name.trim(), parseFloat(price) || 0, (image_url || '').trim(), (category_name || 'ทั่วไป').trim(), parseInt(shelf_life_days) || 7, id],
+            function (err) {
+                if (err) return res.status(500).json({ error: 'อัปเดตสินค้าล้มเหลว: ' + err.message });
+                if (this.changes === 0) return res.status(404).json({ error: 'ไม่พบสินค้า' });
+
+                // prepare change log details
+                const changes = [];
+                if (old.product_name !== product_name.trim()) changes.push(`name: ${old.product_name} → ${product_name.trim()}`);
+                if (old.price !== parseFloat(price) || 0) changes.push(`price: ${old.price} → ${parseFloat(price) || 0}`);
+                if ((old.image_url || '') !== (image_url || '').trim()) changes.push(`image: ${old.image_url || ''} → ${(image_url || '').trim()}`);
+                if (old.category_name !== (category_name || 'ทั่วไป').trim()) changes.push(`category: ${old.category_name} → ${(category_name || 'ทั่วไป').trim()}`);
+                if (old.shelf_life_days !== (parseInt(shelf_life_days) || 7)) changes.push(`shelf_life: ${old.shelf_life_days} → ${(parseInt(shelf_life_days) || 7)}`);
+                const extra = changes.join(' | ');
+                if (changes.length > 0) {
+                    const actor = req.session.user.username;
+                    const now = getBangkokTimestamp();
+                    // atomic insert: only add if no similar record in last minute
+                    const stmt = `
+                        INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date, extra_info)
+                        SELECT ?, ?, NULL, ?, ?, ?
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM Transactions_Log
+                            WHERE action_type='UPDATE_PRODUCT' AND product_id=? AND actor_name=? AND extra_info=?
+                              AND action_date > datetime('now','-1 minute','localtime')
+                        )
+                    `;
+                    db.run(stmt, [
+                        'UPDATE_PRODUCT', id, actor, now, extra,
+                        id, actor, extra
+                    ]);
+                }
+
+                res.json({ message: 'อัปเดตสินค้าสำเร็จ' });
+            }
+        );
+    });
 });
 
 // Delete product (prevent deletion if stock > 0, otherwise delete and log)

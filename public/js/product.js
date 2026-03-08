@@ -211,6 +211,9 @@ function initProductManagement() {
     // EDIT - submit event
     document.getElementById('editProductForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
         const id = document.getElementById('editProductId').value;
         const product_name = document.getElementById('editProductName').value.trim();
         const category_name = document.getElementById('editProductCategory').value;
@@ -240,6 +243,8 @@ function initProductManagement() {
             }
         } catch (err) {
             if (typeof showToast === 'function') showToast('ระบบขัดข้อง กรุณาลองใหม่', 'error');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
         }
     });
 

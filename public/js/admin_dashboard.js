@@ -58,6 +58,7 @@ function initAdminDashboard() {
                     let badge = '', detail = log.extra_info || '-';
                     if (log.action_type === 'CREATE_PRODUCT') badge = '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">สร้างสินค้า</span>';
                     else if (log.action_type === 'DELETE_PRODUCT') badge = '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700">ลบสินค้า</span>';
+                    else if (log.action_type === 'UPDATE_PRODUCT') badge = '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700">แก้ไขสินค้า</span>';
                     else if (log.action_type === 'CREATE_USER') badge = '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-700">สร้างผู้ใช้</span>';
                     else if (log.action_type === 'DELETE_USER') badge = '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-700">ลบผู้ใช้</span>';
                     else badge = `<span class="text-xs text-slate-500">${log.action_type}</span>`;
