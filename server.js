@@ -390,7 +390,7 @@ app.get('/manage-users', requireManager, (req, res) => {
 });
 
 app.get('/admin/users', requireManager, (req, res) => {
-    res.render('admin_users');
+    res.render('admin_users', { activePage: 'admin_users', user: req.session.user });
 });
 
 
