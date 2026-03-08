@@ -544,6 +544,11 @@ app.get('/api/inventory', requireAuth, (req, res) => {
                 grouped[product_id].batches.push({ stock_id, receive_date, expiry_date, quantity, isExpired });
             }
         }
+        if (req.session.user.role === 'staff') {
+            for (const product of Object.values(grouped)) {
+                product.batches = product.batches.map(batch => ({ ...batch, expiry_date: null }));
+            }
+        }
         res.json(Object.values(grouped).filter(p => p.total_quantity > 0 || p.expired_quantity > 0 || p.batches.length === 0));
     });
 });
