@@ -68,16 +68,17 @@
                             </svg>
                         </div>
 
-                        <% if (user && user.role !== 'staff') { %>
-                        <button id="btnToggleExpired"
-                            class="bg-rose-600 hover:bg-rose-700 text-white w-44 justify-center py-2.5 rounded-xl text-sm font-bold shadow-md shadow-rose-600/20 transition-all flex items-center shrink-0 ml-1 sm:ml-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500">
-                            <svg class="w-5 h-5 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            ดูสินค้าหมดอายุ
-                        </button>
-                        <% } %>
+                        <% if (user && user.role !=='staff' ) { %>
+                            <button id="btnToggleExpired"
+                                class="bg-rose-600 hover:bg-rose-700 text-white w-44 justify-center py-2.5 rounded-xl text-sm font-bold shadow-md shadow-rose-600/20 transition-all flex items-center shrink-0 ml-1 sm:ml-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500">
+                                <svg class="w-5 h-5 mr-1.5 shrink-0" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                ดูสินค้าหมดอายุ
+                            </button>
+                            <% } %>
 
                     </div>
                 </div>
@@ -111,7 +112,8 @@
                     </div>
 
                     <!-- Delete Button for Expired Mode (Hidden by default) -->
-                    <div id="deleteExpiredContainer" class="hidden<% if (user && user.role === 'staff') { %> pointer-events-none<% } %> shrink-0 mt-1 sm:mt-0">
+                    <div id="deleteExpiredContainer"
+                        class="hidden<% if (user && user.role === 'staff') { %> pointer-events-none<% } %> shrink-0 mt-1 sm:mt-0">
                         <button id="btnDeleteExpired"
                             class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm shadow-rose-600/20 transition-all flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500">
                             <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -259,7 +261,8 @@
                     role: "<%= locals.user ? locals.user.role : '' %>"
                 };
             </script>
-            <script src="/js/main.js"></script>
+            <script src="/js/utils.js"></script>
+            <script src="/js/dashboard.js"></script>
     </body>
 
 </html>
