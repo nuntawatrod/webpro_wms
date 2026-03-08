@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="th">
+<%- include('layout/head') %>
+
+    <body class="text-slate-800 antialiased min-h-screen">
+
+        <!-- Sidebar -->
+        <%- include('layout/navbar', { activePage: 'admin_permissions' , user: locals.user }) %>
+
+            <!-- Main Content -->
+            <main class="main-content px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+                <div class="flex flex-col md:flex-row justify-between md:items-center mb-8 gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">จัดการสิทธิ์การเข้าถึง (Access Rights)</h1>
+                        <p class="text-sm text-slate-500 mt-1">กำหนดสิทธิ์การใช้งานเมนูและฟีเจอร์ต่างๆ สำหรับแต่ละบทบาท
+                        </p>
+                    </div>
+
+                    <button id="btnSavePermissions"
+                        class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center focus:outline-none">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7">
+                            </path>
+                        </svg>
+                        บันทึกการเปลี่ยนแปลง
+                    </button>
+                </div>
+
+                <div class="bg-white shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200">
+                                    <th class="px-6 py-4 text-xs uppercase tracking-wider text-slate-500 font-bold">
+                                        ฟีเจอร์ / สิทธิ์การใช้งาน</th>
+                                    <th
+                                        class="px-6 py-4 text-center text-xs uppercase tracking-wider text-rose-600 font-bold">
+                                        แอดมิน (Admin)</th>
+                                    <th
+                                        class="px-6 py-4 text-center text-xs uppercase tracking-wider text-indigo-600 font-bold">
+                                        ผู้จัดการ (Manager)</th>
+                                    <th
+                                        class="px-6 py-4 text-center text-xs uppercase tracking-wider text-slate-600 font-bold">
+                                        พนักงาน (Staff)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="permissionTableBody" class="divide-y divide-slate-100">
+                                <!-- Row: Dashboard -->
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-6 py-5">
+                                        <div class="font-semibold text-slate-700">ดูแดชบอร์ดและสถิติ</div>
+                                        <div class="text-xs text-slate-400 mt-0.5">
+                                            เข้าถึงหน้าสรุปภาพรวมระบบและรายงานหลัก</div>
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="admin"
+                                            data-key="view_dashboard"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="manager"
+                                            data-key="view_dashboard"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="staff"
+                                            data-key="view_dashboard"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                </tr>
+                                <!-- Row: User Management -->
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-6 py-5">
+                                        <div class="font-semibold text-slate-700">จัดการบัญชีผู้ใช้และสิทธิ์</div>
+                                        <div class="text-xs text-slate-400 mt-0.5">สร้าง ลบ
+                                            และแก้ไขสิทธิ์ของบุคลากรคนอื่นๆ</div>
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="admin"
+                                            data-key="manage_users"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="manager"
+                                            data-key="manage_users"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="staff"
+                                            data-key="manage_users"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                </tr>
+                                <!-- Row: Product Management -->
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-6 py-5">
+                                        <div class="font-semibold text-slate-700">จัดการข้อมูลสินค้า</div>
+                                        <div class="text-xs text-slate-400 mt-0.5">เพิ่มข้อมูลสินค้าใหม่ แก้ไขราคา
+                                            และข้อมูลหลักของสินค้า</div>
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="admin"
+                                            data-key="manage_products"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="manager"
+                                            data-key="manage_products"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="staff"
+                                            data-key="manage_products"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                </tr>
+                                <!-- Row: Stock Management -->
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-6 py-5">
+                                        <div class="font-semibold text-slate-700">จัดการสต็อก (เติม/เบิก)</div>
+                                        <div class="text-xs text-slate-400 mt-0.5">
+                                            ลงทะเบียนรับเข้าสินค้าและเบิกจ่ายสินค้าออกจากคลัง</div>
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="admin"
+                                            data-key="manage_stock"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="manager"
+                                            data-key="manage_stock"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="staff"
+                                            data-key="manage_stock"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                </tr>
+                                <!-- Row: Delete Expired -->
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-6 py-5">
+                                        <div class="font-semibold text-slate-700">ลบสินค้าหมดอายุ</div>
+                                        <div class="text-xs text-slate-400 mt-0.5">ล้างรายการสินค้าที่หมดอายุออกจากสต็อก
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="admin"
+                                            data-key="delete_expired"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="manager"
+                                            data-key="delete_expired"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-5 text-center"><input type="checkbox" data-role="staff"
+                                            data-key="delete_expired"
+                                            class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-start gap-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <svg class="w-6 h-6 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                        </path>
+                    </svg>
+                    <div class="text-sm text-amber-900">
+                        <p class="font-bold">คำเตือนสำหรับแอดมิน:</p>
+                        <p class="mt-1">การเปลี่ยนแปลงสิทธิ์ในหน้านี้จะมีผลกับ "ทุกบัญชี" ที่มีบทบาทนั้นๆ
+                            กรุณาตรวจสอบให้แน่ใจก่อนทำการบันทึก เพื่อป้องกันไม่ให้เกิดความสับสนในการใช้งาน</p>
+                    </div>
+                </div>
+
+            </main>
+
+            <script src="/js/main.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    fetchPermissions();
+
+                    async function fetchPermissions() {
+                        try {
+                            const res = await fetch('/api/admin/permissions');
+                            const data = await res.json();
+
+                            // Uncheck all first
+                            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+                            // Check enabled ones
+                            data.forEach(p => {
+                                const cb = document.querySelector(`input[data-role="${p.role}"][data-key="${p.permission_key}"]`);
+                                if (cb) cb.checked = true;
+                            });
+                        } catch (e) {
+                            console.error('Failed to fetch permissions');
+                        }
+                    }
+
+                    document.getElementById('btnSavePermissions').addEventListener('click', async () => {
+                        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                        const permissions = Array.from(checkboxes).map(cb => ({
+                            role: cb.dataset.role,
+                            key: cb.dataset.key,
+                            enabled: cb.checked
+                        }));
+
+                        Swal.fire({
+                            title: 'ยืนยันการบันทึก?',
+                            text: 'สิทธิ์ใหม่จะมีผลกับผู้ใช้ทุกคนในระบบทันที',
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonColor: '#4f46e5',
+                            cancelButtonText: 'ยกเลิก',
+                            confirmButtonText: 'ตกลง, บันทึกสิทธิ์'
+                        }).then(async (result) => {
+                            if (result.isConfirmed) {
+                                try {
+                                    const res = await fetch('/api/admin/permissions', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ permissions })
+                                    });
+                                    if (res.ok) {
+                                        Swal.fire('สำเร็จ!', 'อัปเดตสิทธิ์การเข้าถึงเรียบร้อยแล้ว', 'success');
+                                    } else {
+                                        Swal.fire('ล้มเหลว', 'ไม่สามารถบันทึกได้', 'error');
+                                    }
+                                } catch (e) {
+                                    Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง', 'error');
+                                }
+                            }
+                        });
+                    });
+                });
+            </script>
+    </body>
+
+</html>

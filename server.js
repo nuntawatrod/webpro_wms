@@ -50,13 +50,41 @@ const requireAuth = (req, res, next) => {
     }
 };
 
-const requireManager = (req, res, next) => {
-    if (req.session.user && req.session.user.role === 'manager') {
+const hasPermission = (permissionKey) => {
+    return (req, res, next) => {
+        if (!req.session.user) {
+            return res.status(401).redirect('/login');
+        }
+        const role = req.session.user.role;
+        db.get("SELECT 1 FROM Role_Permissions WHERE role = ? AND permission_key = ?", [role, permissionKey], (err, row) => {
+            if (row) {
+                next();
+            } else {
+                if (req.path.startsWith('/api')) {
+                    return res.status(403).json({ error: `ไม่มีสิทธิ์เข้าถึง (Required: ${permissionKey})` });
+                }
+                res.status(403).render('error', { message: 'คุณไม่มีสิทธิ์เข้าถึงส่วนนี้', user: req.session.user });
+            }
+        });
+    };
+};
+
+// --- Updated Middleware Wrappers ---
+const requireAdmin = (req, res, next) => {
+    if (req.session.user && req.session.user.role === 'admin') {
         next();
     } else {
-        if (req.path.startsWith('/api')) {
-            return res.status(403).json({ error: 'ไม่มีสิทธิ์ผู้ดูแลระบบ (Manager required)' });
-        }
+        if (req.path.startsWith('/api')) return res.status(403).json({ error: 'Admin access required' });
+        res.status(403).send('Forbidden: Admin access only');
+    }
+};
+
+const requireManager = (req, res, next) => {
+    // Manager or Admin often have similar base manager rights
+    if (req.session.user && (req.session.user.role === 'manager' || req.session.user.role === 'admin')) {
+        next();
+    } else {
+        if (req.path.startsWith('/api')) return res.status(403).json({ error: 'Manager access required' });
         res.status(403).send('Forbidden: Manager access required');
     }
 };
@@ -79,7 +107,7 @@ function initializeDatabase() {
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             full_name TEXT,
-            role TEXT DEFAULT 'staff' CHECK(role IN ('manager', 'staff')),
+            role TEXT DEFAULT 'staff' CHECK(role IN ('admin', 'manager', 'staff')),
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`);
 
@@ -95,6 +123,41 @@ function initializeDatabase() {
             created_by INTEGER,
             FOREIGN KEY (created_by) REFERENCES Users(id) ON DELETE SET NULL
         )`);
+
+        // Role Permissions Table
+        db.run(`CREATE TABLE IF NOT EXISTS Role_Permissions (
+            role TEXT NOT NULL,
+            permission_key TEXT NOT NULL,
+            PRIMARY KEY (role, permission_key)
+        )`);
+
+        // Seed Default Permissions (Admin, Manager, Staff)
+        const defaultPermissions = [
+            // Admin: All
+            { role: 'admin', key: 'view_dashboard' },
+            { role: 'admin', key: 'manage_users' },
+            { role: 'admin', key: 'manage_products' },
+            { role: 'admin', key: 'manage_stock' },
+            { role: 'admin', key: 'delete_expired' },
+
+            // Manager: Dashboard, Products, Stock, Delete Expired
+            { role: 'manager', key: 'view_dashboard' },
+            { role: 'manager', key: 'manage_products' },
+            { role: 'manager', key: 'manage_stock' },
+            { role: 'manager', key: 'delete_expired' },
+
+            // Staff: Stock Only
+            { role: 'staff', key: 'manage_stock' }
+        ];
+
+        db.get("SELECT COUNT(*) AS count FROM Role_Permissions", (err, row) => {
+            if (!err && row.count === 0) {
+                const stmt = db.prepare("INSERT INTO Role_Permissions (role, permission_key) VALUES (?, ?)");
+                defaultPermissions.forEach(p => stmt.run(p.role, p.key));
+                stmt.finalize();
+                console.log("Seeded default role permissions");
+            }
+        });
 
         // Stock Table
         db.run(`CREATE TABLE IF NOT EXISTS Stock (
@@ -135,8 +198,11 @@ function initializeDatabase() {
             if (!err && row.count === 0) {
                 const salt = bcrypt.genSaltSync(10);
                 const hash = bcrypt.hashSync('1234', salt);
-                db.run(`INSERT INTO Users (username, password, role) VALUES ('admin', ?, 'manager')`, [hash]);
+                db.run(`INSERT INTO Users (username, password, role, full_name) VALUES ('admin', ?, 'admin', 'System Administrator')`, [hash]);
                 console.log("Seeded default Admin user (admin / 1234)");
+            } else {
+                // If admin exists, ensure it has 'admin' role
+                db.run("UPDATE Users SET role = 'admin' WHERE username = 'admin' AND role != 'admin'");
             }
         });
 
@@ -363,13 +429,13 @@ app.get('/history', requireAuth, (req, res) => {
 // ==========================================
 // ROUTES - ADMIN VIEWS
 // ==========================================
-app.get('/admin', requireManager, (req, res) => {
+app.get('/admin', hasPermission('view_dashboard'), (req, res) => {
     // Admin Dashboard Data
     res.render('admin_dashboard');
 });
 
 // Standalone Management Pages (Manager only)
-app.get('/manage-products', requireManager, (req, res) => {
+app.get('/manage-products', hasPermission('manage_products'), (req, res) => {
     let tab = req.query.tab || 'add';
     if (!['add', 'edit', 'delete'].includes(tab)) tab = 'add';
 
@@ -379,12 +445,48 @@ app.get('/manage-products', requireManager, (req, res) => {
     });
 });
 
-app.get('/manage-users', requireManager, (req, res) => {
+app.get('/manage-users', requireAdmin, (req, res) => {
     res.render('manage_users', { activePage: 'manage_users', user: req.session.user });
 });
 
-app.get('/admin/users', requireManager, (req, res) => {
+app.get('/admin/users', requireAdmin, (req, res) => {
     res.render('admin_users', { activePage: 'admin_users', user: req.session.user });
+});
+
+app.get('/admin/permissions', requireAdmin, (req, res) => {
+    res.render('admin_permissions', { activePage: 'admin_permissions', user: req.session.user });
+});
+
+// ==========================================
+// API ENDPOINTS - PERMISSIONS
+// ==========================================
+app.get('/api/admin/permissions', requireAdmin, (req, res) => {
+    db.all("SELECT role, permission_key FROM Role_Permissions", [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.post('/api/admin/permissions', requireAdmin, (req, res) => {
+    const { permissions } = req.body; // Array of { role, key, enabled }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        db.run('DELETE FROM Role_Permissions', (err) => {
+            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ล้างข้อมูลเดิมไม่สำเร็จ' }); }
+
+            const stmt = db.prepare("INSERT INTO Role_Permissions (role, permission_key) VALUES (?, ?)");
+            permissions.forEach(p => {
+                if (p.enabled) stmt.run(p.role, p.key);
+            });
+            stmt.finalize();
+
+            db.run('COMMIT', (err2) => {
+                if (err2) return res.status(500).json({ error: 'บันทึกไม่สำเร็จ' });
+                res.json({ message: 'อัปเดตสิทธิ์การเข้าถึงสำเร็จ' });
+            });
+        });
+    });
 });
 
 
@@ -572,7 +674,7 @@ app.post('/api/stock/withdraw', requireAuth, (req, res) => {
 // ==========================================
 // Delete Expired Products (All or by Category)
 // ==========================================
-app.post('/api/stock/delete-expired', requireAuth, (req, res) => {
+app.post('/api/stock/delete-expired', hasPermission('delete_expired'), (req, res) => {
     const { category, expired_batches } = req.body;
 
     if (!expired_batches || !Array.isArray(expired_batches) || expired_batches.length === 0) {
@@ -797,13 +899,18 @@ app.get('/api/admin/dashboard-stats', requireAuth, (req, res) => {
 });
 
 app.get('/api/admin/system-logs', requireManager, (req, res) => {
+    const isAdmin = req.session.user.role === 'admin';
+    const actionFilter = isAdmin
+        ? "('CREATE_USER', 'DELETE_USER', 'UPDATE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_PRODUCT')"
+        : "('CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_PRODUCT')";
+
     const query = `
         SELECT t.id, t.action_date, t.action_type,
                COALESCE(p.product_name, '[ไม่มี]') AS product_name,
                t.quantity, t.actor_name, t.extra_info
         FROM Transactions_Log t
         LEFT JOIN Products p ON t.product_id = p.id
-        WHERE t.action_type IN ('CREATE_USER', 'DELETE_USER', 'UPDATE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_PRODUCT')
+        WHERE t.action_type IN ${actionFilter}
         ORDER BY t.action_date DESC
         LIMIT 50
     `;
@@ -858,18 +965,18 @@ app.post('/api/admin/reseed-stock', requireManager, (req, res) => {
     });
 });
 
-app.get('/api/admin/users', requireManager, (req, res) => {
+app.get('/api/admin/users', requireAdmin, (req, res) => {
     db.all("SELECT id, username, full_name, role, created_at FROM Users", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
-app.post('/api/admin/users', requireManager, (req, res) => {
+app.post('/api/admin/users', requireAdmin, (req, res) => {
     const { username, password, full_name, role } = req.body;
     if (!username || !password || !full_name) return res.status(400).json({ error: "ใส่ข้อมูลให้ครบ (Missing fields)" });
 
-    const uRole = role === 'manager' ? 'manager' : 'staff';
+    const uRole = (role === 'admin' || role === 'manager') ? role : 'staff';
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
 
@@ -882,7 +989,7 @@ app.post('/api/admin/users', requireManager, (req, res) => {
     });
 });
 
-app.delete('/api/admin/users/:id', requireManager, (req, res) => {
+app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
     const id = req.params.id;
     // Prevent deleting self here
     if (id == req.session.user.id) return res.status(400).json({ error: "ไม่สามารถลบบัญชีตัวเองได้" });
@@ -898,17 +1005,21 @@ app.delete('/api/admin/users/:id', requireManager, (req, res) => {
 });
 
 // Edit user role and/or password
-app.put('/api/admin/users/:id', requireManager, (req, res) => {
+app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
     const id = req.params.id;
-    const { role, password } = req.body;
-    if (!role && !password) return res.status(400).json({ error: 'ไม่มีข้อมูลที่จะอัปเดต' });
+    const { role, password, full_name } = req.body;
+    if (!role && !password && !full_name) return res.status(400).json({ error: 'ไม่มีข้อมูลที่จะอัปเดต' });
 
     const updates = [];
     const params = [];
 
     if (role) {
         updates.push('role = ?');
-        params.push(role === 'manager' ? 'manager' : 'staff');
+        params.push((role === 'admin' || role === 'manager') ? role : 'staff');
+    }
+    if (full_name) {
+        updates.push('full_name = ?');
+        params.push(full_name);
     }
     if (password) {
         const salt = bcrypt.genSaltSync(10);

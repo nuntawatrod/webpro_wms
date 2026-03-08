@@ -48,7 +48,7 @@
                 <span>ประวัติ</span>
             </a>
 
-            <% if (user && user.role==='manager' ) { %>
+            <% if (user && (user.role==='manager' || user.role==='admin' )) { %>
                 <div class="pt-4">
                     <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">ส่วนจัดการระบบ
                     </p>
@@ -104,15 +104,18 @@
                     </div>
 
 
-                    <a href="/admin/users"
-                        class="sidebar-link <%= locals.activePage === 'manage_users' || locals.activePage === 'admin_users' ? 'active' : '' %>">
-                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
-                            </path>
-                        </svg>
-                        <span>จัดการผู้ใช้</span>
-                    </a>
+                    <% if (user.role==='admin' ) { %>
+                        <a href="/admin/users"
+                            class="sidebar-link <%= locals.activePage === 'manage_users' || locals.activePage === 'admin_users' ? 'active' : '' %>">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+                                </path>
+                            </svg>
+                            <span>จัดการผู้ใช้</span>
+                        </a>
+
+                        <% } %>
                 </div>
                 <% } %>
         </nav>
@@ -129,7 +132,8 @@
                         <%= user ? user.username : 'ผู้เยี่ยมชม' %>
                     </p>
                     <p class="text-[10px] text-slate-400 font-medium">
-                        <%= user && user.role==='manager' ? 'ผู้จัดการ' : 'ผู้ปฏิบัติงาน' %>
+                        <%= user ? (user.role==='admin' ? 'แอดมิน' : (user.role==='manager' ? 'ผู้จัดการ'
+                            : 'ผู้ปฏิบัติงาน' )) : 'ผู้เยี่ยมชม' %>
                     </p>
                 </div>
             </div>
