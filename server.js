@@ -1018,4 +1018,9 @@ app.delete('/api/admin/products/:id', requireManager, (req, res) => {
 // Start listening
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
+
+    // Auto-open browser
+    const url = `http://localhost:${PORT}`;
+    const startCmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+    require('child_process').exec(`${startCmd} ${url}`);
 });
