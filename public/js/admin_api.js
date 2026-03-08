@@ -88,4 +88,46 @@ router.delete('/products/:id', requireManager, (req, res) => {
     db.run("DELETE FROM Products WHERE id = ?", [req.params.id], () => res.json({ message: "Deleted" }));
 });
 
+const fs = require('fs');
+const path = require('path');
+const csv = require('csv-parser');
+
+// ... (existing routes)
+
+router.post('/bulk-import', requireManager, (req, res) => {
+    const CSV_PATH = path.join(__dirname, '../../products.csv');
+    if (!fs.existsSync(CSV_PATH)) return res.status(404).json({ error: "ไม่พบไฟล์ products.csv" });
+
+    const productsMap = new Map();
+    fs.createReadStream(CSV_PATH)
+        .pipe(csv({
+            mapHeaders: ({ header }) => header.trim().replace(/^[\uFEFF\u200B]+/, '').replace(/^"/, '').replace(/"$/, '')
+        }))
+        .on('data', (row) => {
+            const { product_name, price, image_url, category_name, shelf_life_days } = row;
+            if (product_name) {
+                productsMap.set(product_name, {
+                    price: parseFloat(price) || 0,
+                    image_url: image_url || '',
+                    category_name: category_name || 'ทั่วไป',
+                    shelf_life_days: parseInt(shelf_life_days) || 7
+                });
+            }
+        })
+        .on('end', () => {
+            db.serialize(() => {
+                db.run('BEGIN TRANSACTION');
+                const stmt = db.prepare(`INSERT OR IGNORE INTO Products (product_name, price, image_url, category_name, status, shelf_life_days) VALUES (?, ?, ?, ?, 'normal', ?)`);
+                for (const [name, data] of productsMap.entries()) {
+                    stmt.run([name, data.price, data.image_url, data.category_name, data.shelf_life_days]);
+                }
+                stmt.finalize();
+                db.run('COMMIT', (err) => {
+                    if (err) return res.status(500).json({ error: "Failed to import" });
+                    res.json({ message: "นำเข้าสินค้าจาก CSV สำเร็จ" });
+                });
+            });
+        });
+});
+
 module.exports = router;
