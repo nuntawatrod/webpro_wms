@@ -238,16 +238,10 @@ function seedFromCSV() {
             mapHeaders: ({ header }) => header.trim().replace(/^[\uFEFF\u200B]+/, '')
         }))
         .on('data', (row) => {
-            const { product_name, price, image_url, category_name, receive_date, expiry_date, status } = row;
+            const { product_name, price, image_url, category_name, shelf_life_days, status } = row;
             if (!product_name) return;
 
-            // Calculate shelf life logic from CSV (if available)
-            let shelf_life_days = 7; // Default 7 days if unknown
-            const rDate = receive_date || todayStr;
-            const expD = calculateDaysBetween(rDate, expiry_date);
-            if (expD !== null && expD > 0) {
-                shelf_life_days = expD;
-            }
+            const shelfLife = parseInt(shelf_life_days) || 7;
 
             if (!productsMap.has(product_name)) {
                 productsMap.set(product_name, {
@@ -255,7 +249,7 @@ function seedFromCSV() {
                     image_url: image_url || '',
                     category_name: category_name || 'ทั่วไป',
                     status: status || 'normal',
-                    shelf_life_days: shelf_life_days
+                    shelf_life_days: shelfLife
                 });
             }
 
@@ -269,9 +263,9 @@ function seedFromCSV() {
             d.setDate(d.getDate() - rOffset);
             const simulatedReceiveDate = d.toISOString().split('T')[0];
 
-            // Expiry = simulated Receive + shelf_life
+            // Expiry = simulated Receive + shelfLife
             const ed = new Date(d);
-            ed.setDate(ed.getDate() + shelf_life_days);
+            ed.setDate(ed.getDate() + shelfLife);
             const simulatedExpiryDate = ed.toISOString().split('T')[0];
 
             stockEntries.push({
