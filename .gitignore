@@ -1,5 +1,4 @@
 node_modules/
-wms.db
 .env
 .DS_Store
 npm-debug.log*
