@@ -11,8 +11,8 @@
                 <!-- Page Header -->
                 <div class="flex flex-col sm:flex-row sm:items-start justify-between mb-8 gap-3">
                     <div class="min-w-0 flex-1">
-                        <h1 class="text-2xl font-bold text-slate-900">Dashboard Overview</h1>
-                        <p class="text-sm text-slate-500 mt-0.5">Welcome back, <span
+                        <h1 class="text-2xl font-bold text-slate-900">ภาพรวมแดชบอร์ด</h1>
+                        <p class="text-sm text-slate-500 mt-0.5">ยินดีต้อนรับกลับ, <span
                                 class="font-semibold text-emerald-600">
                                 <%= locals.user ? locals.user.username : 'Admin' %>
                             </span>!</p>
@@ -24,28 +24,28 @@
                 <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
                     <!-- Total Products -->
                     <div class="stat-card">
-                        <p class="text-xs font-semibold text-slate-500 mb-1">Total Products</p>
+                        <p class="text-xs font-semibold text-slate-500 mb-1">สินค้าทั้งหมด</p>
                         <p id="statTotalProducts" class="text-2xl font-bold text-slate-800">—</p>
-                        <p class="text-xs text-blue-500 font-medium mt-1">Active SKU Tracking</p>
+                        <p class="text-xs text-blue-500 font-medium mt-1">รายการรหัสสินค้าที่จัดการอยู่</p>
                     </div>
                     <!-- Low Stock -->
                     <div class="stat-card">
-                        <p class="text-xs font-semibold text-slate-500 mb-1">Low Stock Items</p>
+                        <p class="text-xs font-semibold text-slate-500 mb-1">สินค้าคงเหลือน้อย</p>
                         <p id="statLowStock" class="text-2xl font-bold text-slate-800">—</p>
-                        <p id="statLowStockNote" class="text-xs text-emerald-500 font-medium mt-1">Stock levels healthy
+                        <p id="statLowStockNote" class="text-xs text-emerald-500 font-medium mt-1">ปริมาณสต็อกปกติ
                         </p>
                     </div>
                     <!-- Categories -->
                     <div class="stat-card">
-                        <p class="text-xs font-semibold text-slate-500 mb-1">Collections</p>
+                        <p class="text-xs font-semibold text-slate-500 mb-1">หมวดหมู่สินค้า</p>
                         <p id="statCategories" class="text-2xl font-bold text-slate-800">—</p>
-                        <p class="text-xs text-violet-500 font-medium mt-1">Series &amp; Categories</p>
+                        <p class="text-xs text-violet-500 font-medium mt-1">ประเภทและกลุ่มสินค้า</p>
                     </div>
                     <!-- Inventory Value -->
                     <div class="stat-card">
-                        <p class="text-xs font-semibold text-slate-500 mb-1">Inventory Value</p>
+                        <p class="text-xs font-semibold text-slate-500 mb-1">มูลค่าสินค้าคงคลัง</p>
                         <p id="statTotalValue" class="text-2xl font-bold text-slate-800">—</p>
-                        <p class="text-xs text-amber-500 font-medium mt-1">Total asset value</p>
+                        <p class="text-xs text-amber-500 font-medium mt-1">มูลค่าทรัพย์สินรวม</p>
                     </div>
                 </div>
 
@@ -55,8 +55,8 @@
                     <!-- Stock Distribution Chart (Full) -->
                     <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                         <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-base font-bold text-slate-800">Stock Distribution</h2>
-                            <span class="text-xs text-slate-400 font-medium">Top 5 Categories</span>
+                            <h2 class="text-base font-bold text-slate-800">การกระจายหมวดหมู่สินค้า</h2>
+                            <span class="text-xs text-slate-400 font-medium">5 อันดับหมวดหมู่สูงสุด</span>
                         </div>
                         <div class="flex items-center gap-6">
                             <div class="relative flex-shrink-0" style="width:220px;height:220px;">
@@ -198,7 +198,7 @@
                         document.getElementById('statTotalProducts').textContent = (statsData.totalProducts ?? '—').toLocaleString();
                         const low = statsData.lowStockCount ?? 0;
                         document.getElementById('statLowStock').textContent = low.toLocaleString();
-                        document.getElementById('statLowStockNote').textContent = low === 0 ? 'Stock levels healthy' : `${low} items need attention`;
+                        document.getElementById('statLowStockNote').textContent = low === 0 ? 'ปริมาณสต็อกปกติ' : `ต้องตรวจสอบ ${low} รายการ`;
                         document.getElementById('statLowStockNote').className = `text-xs font-medium mt-1 ${low === 0 ? 'text-emerald-500' : 'text-rose-500'}`;
                         document.getElementById('statCategories').textContent = (statsData.categoriesCount ?? '—').toLocaleString();
                         document.getElementById('statTotalValue').textContent = '฿' + (statsData.totalValue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });

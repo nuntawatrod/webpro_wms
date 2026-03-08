@@ -15,7 +15,7 @@
 
         <!-- Navigation -->
         <nav class="flex-1 px-3 space-y-0.5 pb-4">
-            <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Main Menu</p>
+            <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">เมนูหลัก</p>
             <a href="/" class="sidebar-link <%= locals.activePage === 'dashboard' ? 'active' : '' %>">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -50,7 +50,8 @@
 
             <% if (user && user.role==='manager' ) { %>
                 <div class="pt-4">
-                    <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Admin</p>
+                    <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">ส่วนจัดการระบบ
+                    </p>
 
                     <a href="/admin" class="sidebar-link <%= locals.activePage === 'admin' ? 'active' : '' %>">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,10 +126,10 @@
                 </div>
                 <div class="min-w-0">
                     <p class="text-sm font-semibold text-slate-700 truncate leading-tight">
-                        <%= user ? user.username : 'Guest' %>
+                        <%= user ? user.username : 'ผู้เยี่ยมชม' %>
                     </p>
                     <p class="text-[10px] text-slate-400 font-medium">
-                        <%= user && user.role==='manager' ? 'Manager' : 'Staff' %>
+                        <%= user && user.role==='manager' ? 'ผู้จัดการ' : 'ผู้ปฏิบัติงาน' %>
                     </p>
                 </div>
             </div>

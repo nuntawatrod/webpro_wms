@@ -32,8 +32,8 @@
                                 <tr
                                     class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
                                     <th class="px-6 py-4">ID</th>
-                                    <th class="px-6 py-4">ชื่อผู้ใช้ (Username)</th>
-                                    <th class="px-6 py-4">บทบาท (Role)</th>
+                                    <th class="px-6 py-4">ชื่อผู้ใช้</th>
+                                    <th class="px-6 py-4">บทบาท</th>
                                     <th class="px-6 py-4 text-center">จัดการ</th>
                                 </tr>
                             </thead>
@@ -76,8 +76,8 @@
                             tr.className = "hover:bg-slate-50 transition-colors";
 
                             const roleBadge = u.role === 'manager'
-                                ? '<span class="px-2.5 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-semibold">Manager</span>'
-                                : '<span class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-semibold">Staff</span>';
+                                ? '<span class="px-2.5 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-semibold">ผู้จัดการ</span>'
+                                : '<span class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-semibold">ผู้ปฏิบัติงาน</span>';
 
                             const canDelete = u.username !== currentUser;
                             const deleteBtn = canDelete
