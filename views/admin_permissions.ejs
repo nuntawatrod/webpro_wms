@@ -167,66 +167,11 @@
 
             </main>
 
-            <script src="/js/main.js"></script>
             <script>
-                document.addEventListener('DOMContentLoaded', () => {
-                    fetchPermissions();
-
-                    async function fetchPermissions() {
-                        try {
-                            const res = await fetch('/api/admin/permissions');
-                            const data = await res.json();
-
-                            // Uncheck all first
-                            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-
-                            // Check enabled ones
-                            data.forEach(p => {
-                                const cb = document.querySelector(`input[data-role="${p.role}"][data-key="${p.permission_key}"]`);
-                                if (cb) cb.checked = true;
-                            });
-                        } catch (e) {
-                            console.error('Failed to fetch permissions');
-                        }
-                    }
-
-                    document.getElementById('btnSavePermissions').addEventListener('click', async () => {
-                        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-                        const permissions = Array.from(checkboxes).map(cb => ({
-                            role: cb.dataset.role,
-                            key: cb.dataset.key,
-                            enabled: cb.checked
-                        }));
-
-                        Swal.fire({
-                            title: 'ยืนยันการบันทึก?',
-                            text: 'สิทธิ์ใหม่จะมีผลกับผู้ใช้ทุกคนในระบบทันที',
-                            icon: 'question',
-                            showCancelButton: true,
-                            confirmButtonColor: '#4f46e5',
-                            cancelButtonText: 'ยกเลิก',
-                            confirmButtonText: 'ตกลง, บันทึกสิทธิ์'
-                        }).then(async (result) => {
-                            if (result.isConfirmed) {
-                                try {
-                                    const res = await fetch('/api/admin/permissions', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ permissions })
-                                    });
-                                    if (res.ok) {
-                                        Swal.fire('สำเร็จ!', 'อัปเดตสิทธิ์การเข้าถึงเรียบร้อยแล้ว', 'success');
-                                    } else {
-                                        Swal.fire('ล้มเหลว', 'ไม่สามารถบันทึกได้', 'error');
-                                    }
-                                } catch (e) {
-                                    Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง', 'error');
-                                }
-                            }
-                        });
-                    });
-                });
+                const AUTH_USER = { username: "<%= locals.user ? locals.user.username : '' %>", role: "<%= locals.user ? locals.user.role : '' %>" };
             </script>
+            <script src="/js/main.js"></script>
+            <script src="/js/admin_permission.js"></script>
     </body>
 
 </html>

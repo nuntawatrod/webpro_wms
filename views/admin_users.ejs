@@ -2,198 +2,65 @@
 <html lang="th">
 <%- include('layout/head') %>
 
-    <body class="text-slate-800 antialiased min-h-screen">
+<body class="text-slate-800 antialiased min-h-screen">
 
-        <%- include('layout/navbar', { activePage: 'admin_users' , user: locals.user }) %>
+<%- include('layout/navbar', { activePage: 'admin_users', user: locals.user }) %>
 
-            <main class="main-content px-4 sm:px-6 lg:px-8 py-8 w-full">
+<main class="main-content px-4 sm:px-6 lg:px-8 py-8 w-full">
 
-                <div class="flex flex-col md:flex-row justify-between md:items-center mb-8 gap-4">
-                    <div>
-                        <h1 class="text-2xl font-bold text-slate-900">จัดการบัญชีผู้ใช้</h1>
-                        <p class="text-sm text-slate-500 mt-1">เพิ่มระบบผู้ใช้และสิทธิ์การเข้าถึง WMS</p>
-                    </div>
+<div class="flex flex-col md:flex-row justify-between md:items-center mb-8 gap-4">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">จัดการบัญชีผู้ใช้</h1>
+        <p class="text-sm text-slate-500 mt-1">เพิ่มระบบผู้ใช้และสิทธิ์การเข้าถึง WMS</p>
+    </div>
 
-                    <div class="flex flex-wrap gap-2">
-                        <a href="/manage-users"
-                            class="bg-emerald-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 transition-all flex items-center focus:outline-none shrink-0 w-fit">
-                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z">
-                                </path>
-                            </svg>
-                            สร้างบัญชีผู้ใช้ใหม่
-                        </a>
-                    </div>
-                </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="/manage-users"
+        class="bg-emerald-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 transition-all flex items-center focus:outline-none shrink-0 w-fit">
+        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+        </svg>
+        สร้างบัญชีผู้ใช้ใหม่
+        </a>
+    </div>
+</div>
 
-                <div class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr
-                                    class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                                    <th class="px-6 py-4">ID</th>
-                                    <th class="px-6 py-4">ชื่อผู้ใช้</th>
-                                    <th class="px-6 py-4">บทบาท</th>
-                                    <th class="px-6 py-4 text-center">จัดการ</th>
-                                </tr>
-                            </thead>
-                            <tbody id="userTableBody" class="divide-y divide-slate-100">
-                                <tr>
-                                    <td colspan="4" class="px-6 py-4 text-center text-slate-500 text-sm">กำลังโหลด...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+<div class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+    <th class="px-6 py-4">ID</th>
+    <th class="px-6 py-4">ชื่อผู้ใช้</th>
+    <th class="px-6 py-4">บทบาท</th>
+    <th class="px-6 py-4 text-center">จัดการ</th>
+</tr>
+</thead>
 
-            </main>
+<tbody id="userTableBody" class="divide-y divide-slate-100">
+<tr>
+<td colspan="4" class="px-6 py-4 text-center text-slate-500 text-sm">
+กำลังโหลด...
+</td>
+</tr>
+</tbody>
 
-            <script src="/js/main.js"></script>
-            <script src="/js/users.js"></script>
-            <script>
-                const AUTH_USER = { username: "<%= locals.user ? locals.user.username : '' %>", role: "<%= locals.user ? locals.user.role : '' %>" };
+</table>
+</div>
+</div>
 
-                document.addEventListener('DOMContentLoaded', () => {
-                    const tableBody = document.getElementById('userTableBody');
-                    const currentUser = AUTH_USER.username;
+</main>
 
-                    fetchUsers();
+<script>
+const AUTH_USER = {
+username: "<%= locals.user ? locals.user.username : '' %>",
+role: "<%= locals.user ? locals.user.role : '' %>"
+};
+</script>
 
-                    async function fetchUsers() {
-                        try {
-                            const res = await fetch('/api/admin/users');
-                            const users = await res.json();
-                            renderUsers(users);
-                        } catch (e) {
-                            tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-rose-500">โหลดข้อมูลล้มเหลว</td></tr>`;
-                        }
-                    }
+<script src="/js/main.js"></script>
+<script src="/js/admin_users.js"></script>
 
-                    function renderUsers(users) {
-                        tableBody.innerHTML = '';
-                        users.forEach(u => {
-                            const tr = document.createElement('tr');
-                            tr.className = "hover:bg-slate-50 transition-colors";
-
-                            let roleBadge = '';
-                            if (u.role === 'admin') {
-                                roleBadge = '<span class="px-2.5 py-1 rounded bg-rose-100 text-rose-800 text-xs font-semibold">แอดมิน</span>';
-                            } else if (u.role === 'manager') {
-                                roleBadge = '<span class="px-2.5 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-semibold">ผู้จัดการ</span>';
-                            } else {
-                                roleBadge = '<span class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-semibold">พนักงาน</span>';
-                            }
-
-                            const isSelf = u.username === currentUser;
-                            const actions = isSelf
-                                ? `<span class="text-xs text-slate-400">บัญชีนี้ (ตัวคุณ)</span>`
-                                : `
-                                    <div class="flex items-center justify-center gap-2">
-                                        <button onclick="managePermissions(${u.id}, '${u.username}', '${u.role}')" 
-                                            class="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-colors" title="จัดการสิทธิ์">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-                                            </svg>
-                                        </button>
-                                        <button onclick="deleteUser(${u.id}, '${u.username}')" 
-                                            class="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors" title="ลบผู้ใช้">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                `;
-
-                            tr.innerHTML = `
-                                <td class="px-6 py-4 text-sm text-slate-500 font-mono">${u.id}</td>
-                                <td class="px-6 py-4">
-                                    <div class="font-medium text-slate-800">${u.username}</div>
-                                    <div class="text-xs text-slate-500">${u.full_name || '-'}</div>
-                                </td>
-                                <td class="px-6 py-4">${roleBadge}</td>
-                                <td class="px-6 py-4 text-center">${actions}</td>
-                            `;
-                            tableBody.appendChild(tr);
-                        });
-                    }
-
-                    // Manage Permissions Logic
-                    window.managePermissions = async (id, username, currentRole) => {
-                        const { value: role } = await Swal.fire({
-                            title: 'หน้าจัดการสิทธิ์',
-                            text: `ปรับเปลี่ยนบทบาทของ "${username}"`,
-                            input: 'select',
-                            inputOptions: {
-                                'staff': 'พนักงาน (Staff)',
-                                'manager': 'ผู้จัดการ (Manager)',
-                                'admin': 'แอดมิน (Admin)'
-                            },
-                            inputValue: currentRole,
-                            showCancelButton: true,
-                            confirmButtonText: 'บันทึก',
-                            cancelButtonText: 'ยกเลิก',
-                            confirmButtonColor: '#4f46e5',
-                            inputValidator: (value) => {
-                                return new Promise((resolve) => {
-                                    resolve();
-                                });
-                            }
-                        });
-
-                        if (role) {
-                            try {
-                                const res = await fetch(`/api/admin/users/${id}`, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ role })
-                                });
-                                if (res.ok) {
-                                    fetchUsers();
-                                    Swal.fire('สำเร็จ!', 'อัปเดตสิทธิ์เรียบร้อยแล้ว', 'success');
-                                } else {
-                                    const data = await res.json();
-                                    Swal.fire('บล้มเหลว', data.error, 'error');
-                                }
-                            } catch (e) {
-                                Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง', 'error');
-                            }
-                        }
-                    };
-
-                    // Delete Logic
-                    window.deleteUser = async (id, username) => {
-                        const conf = await Swal.fire({
-                            title: 'ยืนยันการลบผู้ใช้?',
-                            text: `ต้องการลบผู้ใช้ "${username}" ใช่หรือไม่`,
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonColor: '#ef4444',
-                            cancelButtonColor: '#94a3b8',
-                            confirmButtonText: 'ยืนยันลบ',
-                            cancelButtonText: 'ยกเลิก',
-                            reverseButtons: true
-                        });
-
-                        if (conf.isConfirmed) {
-                            try {
-                                const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
-                                if (res.ok) {
-                                    fetchUsers();
-                                    Swal.fire('ลบสำเร็จ!', '', 'success');
-                                } else {
-                                    const data = await res.json();
-                                    Swal.fire('ลบล้มเหลว', data.error, 'error');
-                                }
-                            } catch (e) {
-                                Swal.fire('ข้อผิดพลาด', 'ระบบขัดข้อง', 'error');
-                            }
-                        }
-                    };
-                });
-            </script>
-    </body>
-
+</body>
 </html>

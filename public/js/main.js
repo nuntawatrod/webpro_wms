@@ -250,12 +250,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof initAdminUsers === 'function') {
             initAdminUsers();
         }
-    } else if (path === '/manage-products') {
+    } else if (path === '/manage-products' || path.startsWith('/manage-products')) {
         if (typeof initProductManagement === 'function') {
             initProductManagement();
         }
     } else if (path === '/admin/permissions') {
-        // Permissions management is already inline in admin_permissions.ejs
-        console.log('Permissions page loaded');
+        if (typeof initAdminPermissions === 'function') {
+            initAdminPermissions();
+        }
+    } else if (path === '/admin' || path === '/admin/dashboard') {
+        if (typeof initAdminDashboard === 'function') {
+            initAdminDashboard();
+        }
+    } else if (path === '/manage-users') {
+        if (typeof initManageUsers === 'function') {
+            initManageUsers();
+        }
     }
 });
