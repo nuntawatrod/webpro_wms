@@ -50,24 +50,7 @@ const requireAuth = (req, res, next) => {
     }
 };
 
-const hasPermission = (permissionKey) => {
-    return (req, res, next) => {
-        if (!req.session.user) {
-            return res.status(401).redirect('/login');
-        }
-        const role = req.session.user.role;
-        db.get("SELECT 1 FROM Role_Permissions WHERE role = ? AND permission_key = ?", [role, permissionKey], (err, row) => {
-            if (row) {
-                next();
-            } else {
-                if (req.path.startsWith('/api')) {
-                    return res.status(403).json({ error: `ไม่มีสิทธิ์เข้าถึง (Required: ${permissionKey})` });
-                }
-                res.status(403).render('error', { message: 'คุณไม่มีสิทธิ์เข้าถึงส่วนนี้', user: req.session.user });
-            }
-        });
-    };
-};
+
 
 // --- Updated Middleware Wrappers ---
 const requireAdmin = (req, res, next) => {
@@ -124,40 +107,7 @@ function initializeDatabase() {
             FOREIGN KEY (created_by) REFERENCES Users(id) ON DELETE SET NULL
         )`);
 
-        // Role Permissions Table
-        db.run(`CREATE TABLE IF NOT EXISTS Role_Permissions (
-            role TEXT NOT NULL,
-            permission_key TEXT NOT NULL,
-            PRIMARY KEY (role, permission_key)
-        )`);
 
-        // Seed Default Permissions (Admin, Manager, Staff)
-        const defaultPermissions = [
-            // Admin: All
-            { role: 'admin', key: 'view_dashboard' },
-            { role: 'admin', key: 'manage_users' },
-            { role: 'admin', key: 'manage_products' },
-            { role: 'admin', key: 'manage_stock' },
-            { role: 'admin', key: 'delete_expired' },
-
-            // Manager: Dashboard, Products, Stock, Delete Expired
-            { role: 'manager', key: 'view_dashboard' },
-            { role: 'manager', key: 'manage_products' },
-            { role: 'manager', key: 'manage_stock' },
-            { role: 'manager', key: 'delete_expired' },
-
-            // Staff: Stock Only
-            { role: 'staff', key: 'manage_stock' }
-        ];
-
-        db.get("SELECT COUNT(*) AS count FROM Role_Permissions", (err, row) => {
-            if (!err && row.count === 0) {
-                const stmt = db.prepare("INSERT INTO Role_Permissions (role, permission_key) VALUES (?, ?)");
-                defaultPermissions.forEach(p => stmt.run(p.role, p.key));
-                stmt.finalize();
-                console.log("Seeded default role permissions");
-            }
-        });
 
         // Stock Table
         db.run(`CREATE TABLE IF NOT EXISTS Stock (
@@ -429,13 +379,13 @@ app.get('/history', requireAuth, (req, res) => {
 // ==========================================
 // ROUTES - ADMIN VIEWS
 // ==========================================
-app.get('/admin', hasPermission('view_dashboard'), (req, res) => {
+app.get('/admin', requireManager, (req, res) => {
     // Admin Dashboard Data
     res.render('admin_dashboard');
 });
 
 // Standalone Management Pages (Manager only)
-app.get('/manage-products', hasPermission('manage_products'), (req, res) => {
+app.get('/manage-products', requireManager, (req, res) => {
     let tab = req.query.tab || 'add';
     if (!['add', 'edit', 'delete'].includes(tab)) tab = 'add';
 
@@ -453,41 +403,7 @@ app.get('/admin/users', requireAdmin, (req, res) => {
     res.render('admin_users', { activePage: 'admin_users', user: req.session.user });
 });
 
-app.get('/admin/permissions', requireAdmin, (req, res) => {
-    res.render('admin_permissions', { activePage: 'admin_permissions', user: req.session.user });
-});
 
-// ==========================================
-// API ENDPOINTS - PERMISSIONS
-// ==========================================
-app.get('/api/admin/permissions', requireAdmin, (req, res) => {
-    db.all("SELECT role, permission_key FROM Role_Permissions", [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
-});
-
-app.post('/api/admin/permissions', requireAdmin, (req, res) => {
-    const { permissions } = req.body; // Array of { role, key, enabled }
-
-    db.serialize(() => {
-        db.run('BEGIN TRANSACTION');
-        db.run('DELETE FROM Role_Permissions', (err) => {
-            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ล้างข้อมูลเดิมไม่สำเร็จ' }); }
-
-            const stmt = db.prepare("INSERT INTO Role_Permissions (role, permission_key) VALUES (?, ?)");
-            permissions.forEach(p => {
-                if (p.enabled) stmt.run(p.role, p.key);
-            });
-            stmt.finalize();
-
-            db.run('COMMIT', (err2) => {
-                if (err2) return res.status(500).json({ error: 'บันทึกไม่สำเร็จ' });
-                res.json({ message: 'อัปเดตสิทธิ์การเข้าถึงสำเร็จ' });
-            });
-        });
-    });
-});
 
 
 // ==========================================
@@ -545,8 +461,10 @@ app.get('/api/inventory', requireAuth, (req, res) => {
             }
         }
         if (req.session.user.role === 'staff') {
+            // For staff: remove expired batches entirely (they can see expiry dates of valid stock)
             for (const product of Object.values(grouped)) {
-                product.batches = product.batches.map(batch => ({ ...batch, expiry_date: null }));
+                product.batches = product.batches.filter(batch => !batch.isExpired);
+                product.expired_quantity = 0;
             }
         }
         res.json(Object.values(grouped).filter(p => p.total_quantity > 0 || p.expired_quantity > 0 || p.batches.length === 0));
@@ -679,7 +597,7 @@ app.post('/api/stock/withdraw', requireAuth, (req, res) => {
 // ==========================================
 // Delete Expired Products (All or by Category)
 // ==========================================
-app.post('/api/stock/delete-expired', hasPermission('delete_expired'), (req, res) => {
+app.post('/api/stock/delete-expired', requireManager, (req, res) => {
     const { category, expired_batches } = req.body;
 
     if (!expired_batches || !Array.isArray(expired_batches) || expired_batches.length === 0) {
