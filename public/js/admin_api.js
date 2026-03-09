@@ -29,17 +29,76 @@ router.post('/permissions', requireAdmin, (req, res) => {
 });
 
 // Dashboard Stats
-router.get('/dashboard-stats', requireManager, (req, res) => {
-    const qP = `SELECT COUNT(id) AS totalProducts FROM Products`;
-    const qL = `SELECT COUNT(id) AS count FROM (SELECT p.id FROM Products p JOIN Stock s ON p.id = s.product_id WHERE s.quantity > 0 GROUP BY p.id HAVING SUM(s.quantity) < 50)`;
-    const qV = `SELECT SUM(s.quantity * p.price) AS totalValue FROM Stock s JOIN Products p ON s.product_id = p.id WHERE s.quantity > 0`;
+router.get('/dashboard-stats', requireManager, async (req, res) => {
+    try {
+        const getOne = (query) => new Promise((resolve, reject) => db.get(query, [], (err, row) => err ? reject(err) : resolve(row)));
+        const getAll = (query) => new Promise((resolve, reject) => db.all(query, [], (err, rows) => err ? reject(err) : resolve(rows)));
 
-    db.get(qP, (err1, r1) => {
-        db.get(qL, (err2, r2) => {
-            db.get(qV, (err3, r3) => {
-                res.json({ totalProducts: r1?.totalProducts || 0, lowStockCount: r2?.count || 0, totalValue: r3?.totalValue || 0 });
-            });
+        const totalProductsParams = await getOne(`SELECT COUNT(id) AS totalProducts FROM Products`);
+        const lowStockParams = await getOne(`SELECT COUNT(id) AS count FROM (SELECT p.id FROM Products p JOIN Stock s ON p.id = s.product_id WHERE s.quantity > 0 GROUP BY p.id HAVING SUM(s.quantity) < 50)`);
+        const totalValueParams = await getOne(`SELECT SUM(s.quantity * p.price) AS totalValue FROM Stock s JOIN Products p ON s.product_id = p.id WHERE s.quantity > 0`);
+        const categoriesCountParams = await getOne(`SELECT COUNT(DISTINCT category_name) AS count FROM Products`);
+
+        const categoryDistribution = await getAll(`
+            SELECT p.category_name, SUM(s.quantity) AS total 
+            FROM Products p JOIN Stock s ON p.id = s.product_id 
+            WHERE s.quantity > 0 
+            GROUP BY p.category_name 
+            ORDER BY total DESC LIMIT 5
+        `);
+
+        const lowStockList = await getAll(`
+            SELECT p.id, p.product_name, SUM(s.quantity) AS total_qty 
+            FROM Products p JOIN Stock s ON p.id = s.product_id 
+            WHERE s.quantity > 0 
+            GROUP BY p.id 
+            HAVING total_qty < 50 
+            ORDER BY total_qty ASC
+        `);
+
+        const frequentReceiveList = await getAll(`
+            SELECT p.product_name, COUNT(*) AS freq, SUM(t.quantity) AS total_qty 
+            FROM Transactions_Log t JOIN Products p ON t.product_id = p.id 
+            WHERE t.action_type = 'ADD' 
+            GROUP BY p.id 
+            ORDER BY freq DESC LIMIT 5
+        `);
+
+        const frequentWithdrawList = await getAll(`
+            SELECT p.product_name, COUNT(*) AS freq, SUM(t.quantity) AS total_qty 
+            FROM Transactions_Log t JOIN Products p ON t.product_id = p.id 
+            WHERE t.action_type = 'WITHDRAW' 
+            GROUP BY p.id 
+            ORDER BY freq DESC LIMIT 5
+        `);
+
+        res.json({
+            totalProducts: totalProductsParams?.totalProducts || 0,
+            lowStockCount: lowStockParams?.count || 0,
+            totalValue: totalValueParams?.totalValue || 0,
+            categoriesCount: categoriesCountParams?.count || 0,
+            categoryDistribution: categoryDistribution || [],
+            lowStockList: lowStockList || [],
+            frequentReceiveList: frequentReceiveList || [],
+            frequentWithdrawList: frequentWithdrawList || []
         });
+    } catch (error) {
+        console.error("Dashboard Stats Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/system-logs', requireManager, (req, res) => {
+    const query = `
+        SELECT action_date, action_type, extra_info, actor_name 
+        FROM Transactions_Log 
+        WHERE action_type IN ('CREATE_PRODUCT', 'DELETE_PRODUCT', 'CREATE_USER', 'DELETE_USER', 'UPDATE_PRODUCT', 'UPDATE_USER')
+        ORDER BY action_date DESC 
+        LIMIT 20
+    `;
+    db.all(query, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
     });
 });
 
