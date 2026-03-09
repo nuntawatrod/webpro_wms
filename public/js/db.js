@@ -40,7 +40,7 @@ function initializeDatabase() {
             product_name TEXT UNIQUE NOT NULL,
             price REAL,
             image_url TEXT,
-            category_name TEXT CHECK(category_name IN ('เนื้อสัตว์', 'ผักผลไม้', 'อาหารทะเล', 'ของแห้ง', 'ทั่วไป')),
+            category_name TEXT CHECK(category_name IN ('เนื้อสัตว์', 'ผัก', 'ผลไม้', 'อาหารทะเล', 'ของแห้ง', 'ทั่วไป')),
             status TEXT DEFAULT 'active',
             shelf_life_days INTEGER DEFAULT 7,
             created_by INTEGER,

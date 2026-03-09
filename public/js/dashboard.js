@@ -148,14 +148,8 @@ function initDashboard() {
 
             if (!matchCat || !matchSearch) return false;
 
-            const hasExpired = p.batches.some(b => {
-                const d = b.daysRemaining;
-                return d !== null && d < 0;
-            });
-            const hasNormal = p.batches.some(b => {
-                const d = b.daysRemaining;
-                return d !== null && d >= 0;
-            });
+            const hasExpired = p.batches.some(b => b.isExpired);
+            const hasNormal = p.batches.some(b => !b.isExpired);
 
             if (p.batches.length === 0) {
                 return !showExpiredMode;
@@ -176,8 +170,8 @@ function initDashboard() {
                     p.batches.forEach(batch => {
                         const d = batch.daysRemaining;
                         if (d !== null) {
-                            if (showExpiredMode && d >= 0) return;
-                            if (!showExpiredMode && d < 0) return;
+                            if (showExpiredMode && !batch.isExpired) return;
+                            if (!showExpiredMode && batch.isExpired) return;
                             if (min === null || d < min) min = d;
                         }
                     });
@@ -230,8 +224,7 @@ function initDashboard() {
             if (showExpiredMode) {
                 sortedData.forEach(p => {
                     p.batches.forEach(b => {
-                        const d = b.daysRemaining;
-                        if (d !== null && d < 0) expiredBatchesCount++;
+                        if (b.isExpired) expiredBatchesCount++;
                     });
                 });
             }
@@ -249,8 +242,7 @@ function initDashboard() {
                         const batchesToDelete = [];
                         sortedData.forEach(p => {
                             p.batches.forEach(b => {
-                                const d = b.daysRemaining;
-                                if (d !== null && d < 0) {
+                                if (b.isExpired) {
                                     batchesToDelete.push({
                                         stock_id: b.stock_id,
                                         product_id: p.id,
@@ -315,15 +307,15 @@ function initDashboard() {
                 if (b.expiry_date) {
                     const days = b.daysRemaining;
                     if (days !== null) {
-                        if (showExpiredMode && days >= 0) return;
-                        if (!showExpiredMode && days < 0) return;
+                        if (showExpiredMode && !b.isExpired) return;
+                        if (!showExpiredMode && b.isExpired) return;
                         if (nearestExpiryDay === null || days < nearestExpiryDay) {
                             nearestExpiryDay = days;
                         }
                     }
                 }
             });
-            isExpired = nearestExpiryDay !== null && nearestExpiryDay < 0;
+            isExpired = product.batches.some(b => b.isExpired);
             const isDanger = !isExpired && nearestExpiryDay !== null && nearestExpiryDay === 0;
             const isWarning = !isExpired && nearestExpiryDay !== null && nearestExpiryDay <= 2 && nearestExpiryDay >= 1;
 
@@ -357,10 +349,7 @@ function initDashboard() {
 
             let deleteBtnHTML = '';
             if (isExpired && showExpiredMode && (typeof AUTH_USER === 'undefined' || AUTH_USER.role !== 'staff')) {
-                const expiredBatchesStr = JSON.stringify(product.batches.filter(b => {
-                    const d = b.daysRemaining;
-                    return d !== null && d < 0;
-                }).map(b => ({
+                const expiredBatchesStr = JSON.stringify(product.batches.filter(b => b.isExpired).map(b => ({
                     stock_id: b.stock_id,
                     product_id: product.id,
                     product_name: product.product_name,
@@ -434,15 +423,15 @@ function initDashboard() {
                 product.batches.forEach(b => {
                     const d = b.daysRemaining;
                     if (d !== null) {
-                        if (showExpiredMode && d >= 0) return;
-                        if (!showExpiredMode && d < 0) return;
+                        if (showExpiredMode && !b.isExpired) return;
+                        if (!showExpiredMode && b.isExpired) return;
                         if (min === null || d < min) min = d;
                     }
                 });
                 return min;
             })();
 
-            const isExpiredProduct = nearestDay !== null && nearestDay < 0;
+            const isExpiredProduct = product.batches.length > 0 && product.batches.some(b => b.isExpired);
             const isDanger = !isExpiredProduct && nearestDay !== null && nearestDay === 0;
             const isWarning = !isExpiredProduct && nearestDay !== null && nearestDay <= 2 && nearestDay >= 1;
             const displayQty = showExpiredMode ? (product.expired_quantity || 0) : product.total_quantity;
@@ -460,10 +449,7 @@ function initDashboard() {
 
             let actionBtnHtml = '';
             if (isExpiredProduct && showExpiredMode && (typeof AUTH_USER === 'undefined' || AUTH_USER.role !== 'staff')) {
-                const expiredBatchesStr = JSON.stringify(product.batches.filter(b => {
-                    const d = b.daysRemaining;
-                    return d !== null && d < 0;
-                }).map(b => ({
+                const expiredBatchesStr = JSON.stringify(product.batches.filter(b => b.isExpired).map(b => ({
                     stock_id: b.stock_id,
                     product_id: product.id,
                     product_name: product.product_name,

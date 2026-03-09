@@ -68,7 +68,7 @@ function initHistoryPage() {
 
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
-            currentSearch = e.target.value.toLowerCase().trim();
+            currentSearch = e.target.value.trim();
             historyPage = 1;
             renderHistoryPage();
         });
@@ -94,10 +94,8 @@ function initHistoryPage() {
         return allHistory.filter(log => {
             let matchesSearch = true;
             if (currentSearch) {
-                const pName = (log.product_name || '').toLowerCase();
-                const aName = (log.actor_name || '').toLowerCase();
-                const exInfo = (log.extra_info || '').toLowerCase();
-                matchesSearch = pName.includes(currentSearch) || aName.includes(currentSearch) || exInfo.includes(currentSearch);
+                const logDateStr = (log.action_date || '').split(' ')[0];
+                matchesSearch = (logDateStr === currentSearch);
             }
             if (!matchesSearch) return false;
 

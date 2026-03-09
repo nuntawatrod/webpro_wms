@@ -38,6 +38,11 @@ router.get('/inventory', requireAuth, (req, res) => {
 
             if (stock_id) {
                 const isExpired = expiry_date < todayStr;
+
+                if (isStaff && isExpired) {
+                    continue; // Skip expired batches for Staff completely
+                }
+
                 if (isExpired) {
                     grouped[product_id].expired_quantity += quantity;
                 } else {
@@ -47,7 +52,7 @@ router.get('/inventory', requireAuth, (req, res) => {
                 grouped[product_id].batches.push({
                     stock_id,
                     receive_date,
-                    expiry_date: isStaff ? null : expiry_date, // Hide expiry from staff if desired
+                    expiry_date: expiry_date, // Expose expiry date so frontend can show countdown limit
                     quantity,
                     isExpired
                 });

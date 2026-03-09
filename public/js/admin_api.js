@@ -112,6 +112,9 @@ router.get('/users', requireAdmin, (req, res) => {
 
 router.post('/users', requireAdmin, (req, res) => {
     const { username, password, full_name, role } = req.body;
+    if (role === 'admin') {
+        return res.status(403).json({ error: "Cannot create 'admin' accounts. Only one admin allowed." });
+    }
     const hash = bcrypt.hashSync(password, 10);
     db.run("INSERT INTO Users (username, password, full_name, role) VALUES (?, ?, ?, ?)", [username, hash, full_name, role], function (err) {
         if (err) return res.status(500).json({ error: "Username exists" });
@@ -122,6 +125,21 @@ router.post('/users', requireAdmin, (req, res) => {
 router.delete('/users/:id', requireAdmin, (req, res) => {
     if (req.params.id == req.session.user.id) return res.status(400).json({ error: "Cannot delete self" });
     db.run("DELETE FROM Users WHERE id = ?", [req.params.id], (err) => res.json({ message: "Deleted" }));
+});
+
+router.put('/users/:id', requireAdmin, (req, res) => {
+    const { role } = req.body;
+    if (role === 'admin') return res.status(403).json({ error: "Cannot assign 'admin' role." });
+
+    db.get("SELECT role FROM Users WHERE id = ?", [req.params.id], (err, user) => {
+        if (err || !user) return res.status(404).json({ error: "User not found" });
+        if (user.role === 'admin') return res.status(403).json({ error: "Cannot change the role of an admin." });
+
+        db.run("UPDATE Users SET role = ? WHERE id = ?", [role, req.params.id], (err) => {
+            if (err) return res.status(500).json({ error: "Update failed" });
+            res.json({ message: "Role updated" });
+        });
+    });
 });
 
 // Product CRUD
