@@ -114,6 +114,45 @@ function showDeleteConfirmModal(message, onConfirm) {
     content.style.display = 'block';
 }
 
+/**
+ * Shared Product Search Dropdown Renderer
+ */
+function renderProductDropdown({ container, list, products, onSelect, displayFn }) {
+    if (!container || !list) return;
+    list.innerHTML = '';
+
+    if (products.length === 0) {
+        list.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">ไม่พบสินค้า</div>';
+        return;
+    }
+
+    products.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'px-4 py-2.5 hover:bg-emerald-50 cursor-pointer text-sm text-slate-700 transition-colors border-b border-slate-50 last:border-0 truncate';
+        div.textContent = displayFn ? displayFn(p) : p.product_name;
+        div.addEventListener('click', () => {
+            onSelect(p);
+            list.classList.add('hidden');
+        });
+        list.appendChild(div);
+    });
+}
+
+/**
+ * Shared Button Loading State Handler
+ */
+function setButtonLoading(btn, isLoading, originalText = 'ตกลง') {
+    if (!btn) return;
+    if (isLoading) {
+        btn.disabled = true;
+        btn.dataset.originalText = btn.innerHTML;
+        btn.innerHTML = `<svg class="animate-spin h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset.originalText || originalText;
+    }
+}
+
 function showLotDetailsModal(productId, inventoryData, showExpiredMode) {
     const product = inventoryData.find(p => p.id === productId || p.id === parseInt(productId));
     if (!product) return;

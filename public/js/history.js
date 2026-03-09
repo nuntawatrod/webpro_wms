@@ -2,8 +2,7 @@
 
 function initHistoryPage() {
     const tableBody = document.getElementById('historyTableBody');
-    const PAGE_SIZE = 100;
-    let allHistory = [];
+    const PAGE_SIZE = 40;
     let historyPage = 1;
 
     let currentSearch = '';
@@ -42,7 +41,7 @@ function initHistoryPage() {
                     currentTypeFilter = opt.id;
                     historyPage = 1;
                     renderFilterUI();
-                    renderHistoryPage();
+                    fetchHistory();
                 });
                 typeFiltersContainer.appendChild(btn);
             });
@@ -59,7 +58,7 @@ function initHistoryPage() {
                     currentDateRange = opt.id;
                     historyPage = 1;
                     renderFilterUI();
-                    renderHistoryPage();
+                    fetchHistory();
                 });
                 dateFiltersContainer.appendChild(btn);
             });
@@ -67,10 +66,14 @@ function initHistoryPage() {
     }
 
     if (searchInput) {
+        let debounceTimer;
         searchInput.addEventListener('input', (e) => {
-            currentSearch = e.target.value.trim();
-            historyPage = 1;
-            renderHistoryPage();
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                currentSearch = e.target.value.trim();
+                historyPage = 1;
+                fetchHistory();
+            }, 300);
         });
     }
 
@@ -78,105 +81,85 @@ function initHistoryPage() {
         btnExportCsv.addEventListener('click', exportToCSV);
     }
 
-    function getFilteredData() {
-        const now = new Date();
-        now.setHours(23, 59, 59, 999);
-        let cutoffDate = null;
-        if (currentDateRange !== 'all') {
-            cutoffDate = new Date(now);
-            if (currentDateRange === '1M') cutoffDate.setMonth(cutoffDate.getMonth() - 1);
-            else if (currentDateRange === '3M') cutoffDate.setMonth(cutoffDate.getMonth() - 3);
-            else if (currentDateRange === '6M') cutoffDate.setMonth(cutoffDate.getMonth() - 6);
-            else if (currentDateRange === '1Y') cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
-            cutoffDate.setHours(0, 0, 0, 0);
-        }
+    async function exportToCSV() {
+        try {
+            // Fetch up to 10,000 records for export with current filters
+            const url = new URL(`${window.location.origin}${API_BASE}/history`);
+            url.searchParams.append('page', 1);
+            url.searchParams.append('limit', 10000); // large limit for export
+            url.searchParams.append('search', currentSearch);
+            url.searchParams.append('actionType', currentTypeFilter);
+            url.searchParams.append('actionDateType', currentDateRange);
 
-        return allHistory.filter(log => {
-            let matchesSearch = true;
-            if (currentSearch) {
-                const logDateStr = (log.action_date || '').split(' ')[0];
-                matchesSearch = (logDateStr === currentSearch);
+            const res = await fetch(url);
+            if (!res.ok) throw new Error();
+            const json = await res.json();
+            const dataToExport = json.data;
+
+            if (!dataToExport || dataToExport.length === 0) {
+                showToast('ไม่มีข้อมูลที่จะ Export', 'error');
+                return;
             }
-            if (!matchesSearch) return false;
 
-            let matchesType = true;
-            if (currentTypeFilter !== 'all') {
-                if (currentTypeFilter === 'ADD' || currentTypeFilter === 'WITHDRAW') matchesType = log.action_type === currentTypeFilter;
-                else if (currentTypeFilter === 'EXPIRED') matchesType = log.action_type === 'EXPIRED';
-            }
-            if (!matchesType) return false;
+            const headers = ['วัน-เวลา', 'ประเภทรายการ', 'ชื่อสินค้า / รายละเอียด', 'จำนวน', 'ผู้ทำรายการ'];
+            const rows = dataToExport.map(log => {
+                const rawDate = (log.action_date || '');
+                const d = new Date(rawDate.replace(' ', 'T') + '+07:00');
+                const dateStr = isNaN(d.getTime()) ? rawDate : d.toLocaleString('th-TH', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok'
+                });
 
-            let matchesDate = true;
-            if (cutoffDate) {
-                const logDateStr = (log.action_date || '').replace(' ', 'T');
-                const logDate = new Date(logDateStr);
-                if (!isNaN(logDate)) matchesDate = logDate >= cutoffDate;
-            }
-            if (!matchesDate) return false;
+                const type = log.action_type || '';
+                let productStr = log.product_name || '';
+                if (log.extra_info && type !== 'EXPIRED') productStr = log.extra_info;
+                if (type === 'EXPIRED') productStr = log.extra_info ? (log.product_name || log.extra_info.split(' | ')[0]) + ' (หมดอายุ)' : log.product_name;
 
-            return true;
-        });
-    }
-
-    function exportToCSV() {
-        const dataToExport = getFilteredData();
-        if (dataToExport.length === 0) {
-            showToast('ไม่มีข้อมูลที่จะ Export', 'error');
-            return;
-        }
-
-        const headers = ['วัน-เวลา', 'ประเภทรายการ', 'ชื่อสินค้า / รายละเอียด', 'จำนวน', 'ผู้ทำรายการ'];
-        const rows = dataToExport.map(log => {
-            const rawDate = (log.action_date || '');
-            const d = new Date(rawDate.replace(' ', 'T') + '+07:00');
-            const dateStr = isNaN(d.getTime()) ? rawDate : d.toLocaleString('th-TH', {
-                day: '2-digit', month: '2-digit', year: 'numeric',
-                hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok'
+                return [dateStr, type, productStr.replace(/"/g, '""'), log.quantity || '', log.actor_name || ''];
             });
 
-            const type = log.action_type || '';
-            let productStr = log.product_name || '';
-            if (log.extra_info && type !== 'EXPIRED') productStr = log.extra_info;
-            if (type === 'EXPIRED') productStr = log.extra_info ? (log.product_name || log.extra_info.split(' | ')[0]) + ' (หมดอายุ)' : log.product_name;
-
-            return [dateStr, type, productStr.replace(/"/g, '""'), log.quantity || '', log.actor_name || ''];
-        });
-
-        const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `wms_history_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', blobUrl);
+            link.setAttribute('download', `wms_history_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (e) {
+            showToast('ส่งออกข้อมูลผิดพลาด', 'error');
+        }
     }
 
     async function fetchHistory() {
         try {
-            const res = await fetch(`${API_BASE}/history`);
+            const url = new URL(`${window.location.origin}${API_BASE}/history`);
+            url.searchParams.append('page', historyPage);
+            url.searchParams.append('limit', PAGE_SIZE);
+            url.searchParams.append('search', currentSearch);
+            url.searchParams.append('actionType', currentTypeFilter);
+            url.searchParams.append('actionDateType', currentDateRange);
+
+            if (tableBody) tableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500">กำลังโหลด...</td></tr>`;
+
+            const res = await fetch(url);
             if (!res.ok) throw new Error();
-            allHistory = await res.json();
-            historyPage = 1;
-            renderFilterUI();
-            renderHistoryPage();
+            const json = await res.json();
+
+            renderHistoryPage(json.data, json.meta);
         } catch (e) {
             if (tableBody) tableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-rose-500">โหลดข้อมูลผิดพลาด โปรดลองใหม่</td></tr>`;
         }
     }
 
-    function renderHistoryPage() {
+    function renderHistoryPage(pageData, meta) {
         if (!tableBody) return;
-        const filteredData = getFilteredData();
-        const total = filteredData.length;
-        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-        if (historyPage > totalPages) historyPage = totalPages;
-        const start = (historyPage - 1) * PAGE_SIZE;
-        const pageData = filteredData.slice(start, start + PAGE_SIZE);
+        const total = meta.total;
+        const totalPages = meta.totalPages || 1;
 
-        if (total === 0) {
+        if (total === 0 || !pageData || pageData.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500">ไม่พบประวัติการทำรายการตามเงื่อนไขที่เลือก</td></tr>`;
         } else {
             tableBody.innerHTML = '';
@@ -223,17 +206,35 @@ function initHistoryPage() {
         const pg = document.getElementById('historyPagination');
         if (!pg) return;
         if (totalPages <= 1) { pg.innerHTML = ''; return; }
+
+        const startItem = (historyPage - 1) * PAGE_SIZE + 1;
+        const endItem = Math.min(startItem + PAGE_SIZE - 1, total);
+
         pg.innerHTML = `
-            <span>แสดง ${start + 1}–${Math.min(start + PAGE_SIZE, total)} จาก ${total} รายการ</span>
+            <span>แสดง ${total > 0 ? startItem : 0}–${endItem} จาก ${total} รายการ</span>
             <div class="flex items-center gap-1">
                 <button id="histPrevBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm ${historyPage === 1 ? 'opacity-40 pointer-events-none' : 'hover:bg-slate-100'}">ก่อนหน้า</button>
                 <span class="px-3 py-1.5 text-sm font-semibold text-emerald-700">${historyPage} / ${totalPages}</span>
                 <button id="histNextBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm ${historyPage === totalPages ? 'opacity-40 pointer-events-none' : 'hover:bg-slate-100'}">ถัดไป</button>
             </div>`;
-        document.getElementById('histPrevBtn')?.addEventListener('click', () => { historyPage--; renderHistoryPage(); window.scrollTo(0, 0); });
-        document.getElementById('histNextBtn')?.addEventListener('click', () => { historyPage++; renderHistoryPage(); window.scrollTo(0, 0); });
+
+        document.getElementById('histPrevBtn')?.addEventListener('click', () => {
+            if (historyPage > 1) {
+                historyPage--;
+                fetchHistory();
+                window.scrollTo(0, 0);
+            }
+        });
+        document.getElementById('histNextBtn')?.addEventListener('click', () => {
+            if (historyPage < totalPages) {
+                historyPage++;
+                fetchHistory();
+                window.scrollTo(0, 0);
+            }
+        });
     }
 
+    renderFilterUI();
     fetchHistory();
 }
 

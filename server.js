@@ -6,10 +6,8 @@ const path = require('path');
 
 // Import modular components
 const db = require('./public/js/db');
-const authRoutes = require('./public/js/auth_routes');
-const pageRoutes = require('./public/js/pages_routes');
-const adminApi = require('./public/js/admin_api');
-const inventoryApi = require('./public/js/inventory_api');
+// Import routes
+const routes = require('./public/js/routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,10 +37,7 @@ app.use((req, res, next) => {
 });
 
 // --- Routes ---
-app.use('/', authRoutes);
-app.use('/', pageRoutes);
-app.use('/api', inventoryApi);
-app.use('/api/admin', adminApi);
+app.use('/', routes);
 
 // Handle errors
 app.use((err, req, res, next) => {

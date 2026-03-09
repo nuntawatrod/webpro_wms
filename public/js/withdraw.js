@@ -25,24 +25,15 @@ function initWithdrawPage() {
     }
 
     function renderCustomDropdown(products) {
-        if (!wdProductList) return;
-        wdProductList.innerHTML = '';
-        if (products.length === 0) {
-            wdProductList.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">ไม่มีสินค้าคงเหลือในสต็อก</div>';
-            return;
-        }
-
-        products.forEach(p => {
-            const div = document.createElement('div');
-            div.className = 'px-4 py-3 hover:bg-emerald-50 cursor-pointer text-sm text-slate-700 transition-colors border-b border-slate-50 last:border-0 truncate';
-            div.textContent = p.product_name;
-            div.addEventListener('click', () => {
+        renderProductDropdown({
+            container: document.getElementById('wdProductContainer'),
+            list: wdProductList,
+            products: products,
+            onSelect: (p) => {
                 wdProductInput.value = p.product_name;
                 wdSelectedProductId.value = p.id;
-                wdProductList.classList.add('hidden');
                 validateForm();
-            });
-            wdProductList.appendChild(div);
+            }
         });
     }
 
@@ -92,8 +83,7 @@ function initWithdrawPage() {
         btnWithdrawSubmit.addEventListener('click', async () => {
             if (btnWithdrawSubmit.disabled) return;
 
-            btnWithdrawSubmit.disabled = true;
-            btnWithdrawSubmit.textContent = 'กำลังดำเนินการ...';
+            setButtonLoading(btnWithdrawSubmit, true);
 
             const payload = {
                 product_id: parseInt(wdSelectedProductId.value),
@@ -119,7 +109,7 @@ function initWithdrawPage() {
             } catch (e) {
                 showToast('เครือข่ายขัดข้อง', 'error');
             } finally {
-                btnWithdrawSubmit.textContent = 'ยืนยันการเบิก';
+                setButtonLoading(btnWithdrawSubmit, false, 'ยืนยันการเบิก');
                 validateForm();
             }
         });

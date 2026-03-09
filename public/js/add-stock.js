@@ -26,24 +26,16 @@ function initAddStockPage() {
     }
 
     function renderProductSearchOptions(products) {
-        if (!productSearchResults) return;
-        productSearchResults.innerHTML = '';
-        if (products.length === 0) {
-            productSearchResults.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">ไม่พบสินค้า</div>';
-            return;
-        }
-
-        products.forEach(p => {
-            const div = document.createElement('div');
-            div.className = 'px-4 py-2.5 hover:bg-emerald-50 cursor-pointer text-sm text-slate-700 transition-colors border-b border-slate-50 last:border-0';
-            div.textContent = `${p.product_name} (นำเข้าใหม่จะเก็บได้ ${p.shelf_life_days} วัน)`;
-            div.addEventListener('click', () => {
+        renderProductDropdown({
+            container: productSearchContainer,
+            list: productSearchResults,
+            products: products,
+            displayFn: (p) => `${p.product_name} (นำเข้าใหม่จะเก็บได้ ${p.shelf_life_days} วัน)`,
+            onSelect: (p) => {
                 productSearchInput.value = p.product_name;
                 selectedProductId.value = p.id;
-                productSearchResults.classList.add('hidden');
                 validateAddForm();
-            });
-            productSearchResults.appendChild(div);
+            }
         });
     }
 
@@ -91,8 +83,7 @@ function initAddStockPage() {
         btnConfirmAdd.addEventListener('click', async () => {
             if (btnConfirmAdd.disabled) return;
 
-            btnConfirmAdd.disabled = true;
-            btnConfirmAdd.innerHTML = `<svg class="animate-spin h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            setButtonLoading(btnConfirmAdd, true);
 
             const payload = {
                 product_id: parseInt(selectedProductId.value),
@@ -113,13 +104,13 @@ function initAddStockPage() {
                     setTimeout(() => { window.location.href = '/'; }, 1500);
                 } else {
                     showToast(data.error || 'ล้มเหลวในการเพิ่มสต็อก', 'error');
-                    btnConfirmAdd.innerHTML = 'ยืนยันเพิ่มสต็อก';
+                    setButtonLoading(btnConfirmAdd, false, 'ยืนยันเพิ่มสต็อก');
                     validateAddForm();
                 }
             } catch (err) {
                 console.error(err);
                 showToast('ระบบเครือข่ายขัดข้อง', 'error');
-                btnConfirmAdd.innerHTML = 'ยืนยันเพิ่มสต็อก';
+                setButtonLoading(btnConfirmAdd, false, 'ยืนยันเพิ่มสต็อก');
                 validateAddForm();
             }
         });

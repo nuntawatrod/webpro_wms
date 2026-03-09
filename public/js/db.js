@@ -5,7 +5,7 @@ const fs = require('fs');
 const csv = require('csv-parser');
 const bcrypt = require('bcryptjs');
 
-// Since this file is now in public/js/, the database path needs to be adjusted
+// Since this file is in public/js/, the database path needs to be adjusted
 const DB_PATH = path.join(__dirname, '../../wms.db');
 const CSV_PATH = path.join(__dirname, '../../products.csv');
 
