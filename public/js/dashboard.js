@@ -2,7 +2,7 @@
 
 function initDashboard() {
     let inventoryData = [];
-    let currentView = 'grid';
+    let currentView = 'grid'; // default
     let currentSearch = '';
     let currentCategory = 'all';
     let currentSort = 'expiry-asc';
@@ -18,7 +18,6 @@ function initDashboard() {
     const emptyState = document.getElementById('emptyState');
     const loadingIndicator = document.getElementById('loadingIndicator');
 
-    // Toggle expired view
     const btnToggleExpired = document.getElementById('btnToggleExpired');
     if (btnToggleExpired) {
         btnToggleExpired.addEventListener('click', () => {
@@ -37,12 +36,14 @@ function initDashboard() {
 
     fetchInventory();
 
+    // ✅ แก้ไข: เพิ่มการระบุ b.isExpired ให้ชัดเจน
     function precalculateExpiries() {
         if (!inventoryData) return;
         updateBkkTodayDate();
         inventoryData.forEach(p => {
             p.batches.forEach(b => {
                 b.daysRemaining = getDaysRemaining(b.expiry_date);
+                b.isExpired = b.daysRemaining !== null && b.daysRemaining < 0;
             });
         });
     }
@@ -84,16 +85,12 @@ function initDashboard() {
         }
     }
 
-    // ---- Expiry Banner ----
     function updateExpiryBanner() {
         const banner = document.getElementById('expiryBanner');
         const bannerText = document.getElementById('expiryBannerText');
         if (!banner || !bannerText) return;
         const expiredToday = inventoryData.filter(p =>
-            p.batches.some(b => {
-                const d = b.daysRemaining;
-                return d !== null && d <= 0;
-            })
+            p.batches.some(b => b.daysRemaining !== null && b.daysRemaining <= 0)
         );
         if (expiredToday.length > 0) {
             const names = expiredToday.slice(0, 3).map(p => p.product_name).join(', ');
@@ -147,26 +144,28 @@ function initDashboard() {
             const matchCat = currentCategory === 'all' || (p.category_name || 'ทั่วไป') === currentCategory;
             const matchSearch = currentSearch === '' || p.product_name.toLowerCase().includes(currentSearch);
             if (!matchCat || !matchSearch) return false;
-            const hasExpired = p.batches.some(b => b.daysRemaining !== null && b.daysRemaining < 0);
-            const hasNormal = p.batches.some(b => b.daysRemaining !== null && b.daysRemaining >= 0);
+
+            const hasExpired = p.batches.some(b => b.isExpired);
+            const hasNormal = p.batches.some(b => !b.isExpired);
+
             if (p.batches.length === 0) return !showExpiredMode;
-            return showExpiredMode ? hasExpired : (hasNormal || p.total_quantity === 0);
+            return showExpiredMode ? hasExpired : (hasNormal || (p.total_quantity === 0 && (p.expired_quantity || 0) === 0));
         });
 
         const sortedData = [...filtered].sort((a, b) => {
             if (currentSort === 'qty-desc') {
-                const qA = showExpiredMode ? (a.expired_quantity || 0) : a.total_quantity;
-                const qB = showExpiredMode ? (b.expired_quantity || 0) : b.total_quantity;
-                if (qA === qB) return a.product_name.localeCompare(b.product_name, 'th');
-                return qB - qA;
+                const qtyA = showExpiredMode ? (a.expired_quantity || 0) : a.total_quantity;
+                const qtyB = showExpiredMode ? (b.expired_quantity || 0) : b.total_quantity;
+                if (qtyA === qtyB) return a.product_name.localeCompare(b.product_name, 'th');
+                return qtyB - qtyA;
             } else if (currentSort === 'expiry-asc') {
                 const getNearest = (p) => {
                     let min = null;
-                    p.batches.forEach(batch => {
-                        const d = batch.daysRemaining;
+                    p.batches.forEach(b => {
+                        const d = b.daysRemaining;
                         if (d !== null) {
-                            if (showExpiredMode && d >= 0) return;
-                            if (!showExpiredMode && d < 0) return;
+                            if (showExpiredMode && !b.isExpired) return;
+                            if (!showExpiredMode && b.isExpired) return;
                             if (min === null || d < min) min = d;
                         }
                     });
@@ -179,10 +178,10 @@ function initDashboard() {
                 if (da === db) return a.product_name.localeCompare(b.product_name, 'th');
                 return da - db;
             } else {
-                const qA = showExpiredMode ? (a.expired_quantity || 0) : a.total_quantity;
-                const qB = showExpiredMode ? (b.expired_quantity || 0) : b.total_quantity;
-                if (qA === qB) return a.product_name.localeCompare(b.product_name, 'th');
-                return qA - qB;
+                const qtyA = showExpiredMode ? (a.expired_quantity || 0) : a.total_quantity;
+                const qtyB = showExpiredMode ? (b.expired_quantity || 0) : b.total_quantity;
+                if (qtyA === qtyB) return a.product_name.localeCompare(b.product_name, 'th');
+                return qtyA - qtyB;
             }
         });
 
@@ -209,40 +208,42 @@ function initDashboard() {
             }
         }
 
-        // Delete expired batch button (header)
+        // Global Delete All Expired
         const deleteContainer = document.getElementById('deleteExpiredContainer');
         const btnDelete = document.getElementById('btnDeleteExpired');
         const btnDeleteText = document.getElementById('btnDeleteExpiredText');
 
-        if (deleteContainer && btnDelete && btnDeleteText && (!AUTH_USER || AUTH_USER.role !== 'staff')) {
+        if (deleteContainer && btnDelete && btnDeleteText && (typeof AUTH_USER === 'undefined' || AUTH_USER.role !== 'staff')) {
             let expiredBatchesCount = 0;
             if (showExpiredMode) {
-                sortedData.forEach(p => p.batches.forEach(b => {
-                    if (b.daysRemaining !== null && b.daysRemaining < 0) expiredBatchesCount++;
-                }));
+                sortedData.forEach(p => { p.batches.forEach(b => { if (b.isExpired) expiredBatchesCount++; }); });
             }
+
             if (showExpiredMode && expiredBatchesCount > 0) {
                 deleteContainer.classList.remove('hidden');
                 btnDeleteText.textContent = `ลบสินค้าหมดอายุ${currentCategory !== 'all' ? 'ในหมวดนี้' : 'ทั้งหมด'} (${expiredBatchesCount})`;
+
                 const newBtnDelete = btnDelete.cloneNode(true);
                 btnDelete.parentNode.replaceChild(newBtnDelete, btnDelete);
-                newBtnDelete.addEventListener('click', async () => {
-                    const batchesToDelete = [];
-                    sortedData.forEach(p => p.batches.forEach(b => {
-                        if (b.daysRemaining !== null && b.daysRemaining < 0)
-                            batchesToDelete.push({ product_id: p.id, stock_id: b.stock_id });
-                    }));
-                    if (batchesToDelete.length === 0) { showToast('ไม่มีสินค้าหมดอายุให้ลบ', 'error'); return; }
-                    showDeleteConfirmModal(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุ ${batchesToDelete.length} ล็อต?`, async () => {
+
+                newBtnDelete.addEventListener('click', () => {
+                    showDeleteConfirmModal(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`, async () => {
+                        const batchesToDelete = [];
+                        sortedData.forEach(p => {
+                            p.batches.forEach(b => {
+                                if (b.isExpired) {
+                                    batchesToDelete.push({ stock_id: b.stock_id, product_id: p.id });
+                                }
+                            });
+                        });
                         try {
                             const res = await fetch(`${API_BASE}/stock/delete-expired`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
                             });
-                            const result = await res.json();
-                            if (res.ok) { showToast('ลบรายการสำเร็จ', 'success'); reloadInventorySilently(); }
-                            else alert(result.error || 'เกิดข้อผิดพลาดในการลบ');
+                            if (res.ok) { showToast('ลบสำเร็จ', 'success'); reloadInventorySilently(); }
+                            else alert('เกิดข้อผิดพลาดในการลบ');
                         } catch (err) { alert('เกิดข้อผิดพลาดในการเชื่อมต่อ'); }
                     });
                 });
@@ -252,155 +253,217 @@ function initDashboard() {
         }
     }
 
-    // =============================================
-    // RENDER GRID — UI แบบเก่า (รูปภาพ + แถบสี + ปุ่มดูรายละเอียด)
-    // =============================================
-    function renderGrid(pageData) {
+    // ===================================
+    // RENDER GRID (UI สวยๆ ของเก่า)
+    // ===================================
+    function renderGrid(data) {
         gridView.innerHTML = '';
-        pageData.forEach(product => {
-            const card = document.createElement('div');
-            card.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col group product-card';
-
-            const activeQty = product.total_quantity;
-            const expiredQty = product.expired_quantity || 0;
-
-            // พื้นหลัง + สีตัวเลขตาม stock level
-            let qtyClass = 'text-emerald-600';
-            let qtyBgClass = 'bg-emerald-50';
-            if (activeQty === 0) {
-                qtyClass = 'text-slate-500'; qtyBgClass = 'bg-slate-50';
-            } else if (activeQty < 50) {
-                qtyClass = 'text-amber-600'; qtyBgClass = 'bg-amber-50';
-            }
-
-            // วันหมดอายุที่ใกล้ที่สุด (เฉพาะ batch ที่ยังไม่หมด)
-            let nearestExpiry = null;
-            let nearestDays = null;
+        data.forEach(product => {
+            let nearestExpiryDay = null;
+            let isExpired = false;
             product.batches.forEach(b => {
-                const days = b.daysRemaining;
-                if (days !== null && days >= 0) {
-                    if (nearestDays === null || days < nearestDays) {
-                        nearestDays = days; nearestExpiry = b.expiry_date;
+                if (b.expiry_date) {
+                    const days = b.daysRemaining;
+                    if (days !== null) {
+                        if (showExpiredMode && !b.isExpired) return;
+                        if (!showExpiredMode && b.isExpired) return;
+                        if (nearestExpiryDay === null || days < nearestExpiryDay) nearestExpiryDay = days;
                     }
                 }
             });
+            isExpired = showExpiredMode;
+            const isDanger = !isExpired && nearestExpiryDay !== null && nearestExpiryDay === 0;
+            const isWarning = !isExpired && nearestExpiryDay !== null && nearestExpiryDay <= 2 && nearestExpiryDay >= 1;
 
-            // สีวันหมดอายุ
-            let expiryColor = 'text-amber-600';
-            if (nearestDays !== null && nearestDays === 0) expiryColor = 'text-rose-600';
-            else if (nearestDays !== null && nearestDays <= 2) expiryColor = 'text-orange-500';
+            let cardBorderClass = 'border-slate-200';
+            if (isExpired) cardBorderClass = 'border-slate-400 ring-1 ring-slate-400';
+            else if (isDanger) cardBorderClass = 'border-rose-400 ring-1 ring-rose-400';
+            else if (isWarning) cardBorderClass = 'border-amber-400 ring-1 ring-amber-400';
+
+            const card = document.createElement('div');
+            card.className = `product-card bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col relative ${cardBorderClass}`;
+
+            let badgeHTML = '';
+            if (isExpired) badgeHTML = `<div class="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>หมดอายุ</div>`;
+            else if (isDanger) badgeHTML = `<div class="absolute top-3 right-3 bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>วันนี้</div>`;
+            else if (isWarning) badgeHTML = `<div class="absolute top-3 right-3 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>ใกล้หมดอายุ (${nearestExpiryDay} วัน)</div>`;
+
+            let expiryDisplay = '';
+            if (nearestExpiryDay !== null) {
+                if (nearestExpiryDay < 0) expiryDisplay = `<p class="text-xs text-slate-400 font-semibold mt-1">หมดอายุมาแล้ว ${Math.abs(nearestExpiryDay)} วัน</p>`;
+                else if (isDanger) expiryDisplay = `<p class="text-xs text-rose-500 font-semibold mt-1">วันนี้</p>`;
+                else if (isWarning) expiryDisplay = `<p class="text-xs text-amber-600 font-semibold mt-1">เหลือ ${nearestExpiryDay} วัน</p>`;
+            }
+
+            // ✅ แก้ไข: เก็บแค่ ID สินค้าแทนการส่งตระกร้า JSON ขนาดใหญ่
+            let deleteBtnHTML = '';
+            if (isExpired && showExpiredMode && (typeof AUTH_USER === 'undefined' || AUTH_USER.role !== 'staff')) {
+                deleteBtnHTML = `<button class="btn-delete-single absolute top-12 right-3 bg-rose-50 hover:bg-rose-100 text-rose-600 p-1.5 rounded-full shadow-sm z-10 transition-colors" data-id="${product.id}" title="ลบสินค้าหมดอายุรายการนี้"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
+            }
+
+            let expandBtnHTML = '';
+            if (product.batches.length > 0) expandBtnHTML = `<button class="btn-expand-grid text-slate-400 hover:text-emerald-600 focus:outline-none p-1.5 rounded-full hover:bg-emerald-50 transition-colors ml-2" data-id="${product.id}"><svg class="w-5 h-5 transition-transform duration-200 target-icon-${product.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>`;
+
+            const displayQty = showExpiredMode ? (product.expired_quantity || 0) : product.total_quantity;
+            const isOutOfStock = displayQty === 0;
 
             card.innerHTML = `
-                <img loading="lazy"
-                     src="${product.image_url || '/images/placeholder.png'}"
-                     alt="${product.product_name}"
-                     class="w-full h-48 object-cover bg-slate-100">
-                <div class="${qtyBgClass} px-4 py-2.5 border-b border-slate-100">
-                    <div class="text-xs text-slate-600 uppercase tracking-widest font-semibold mb-0.5">${product.category_name || 'ทั่วไป'}</div>
-                    <div class="flex items-end justify-between">
-                        <div>
-                            <div class="text-xs text-slate-500">สต็อกปัจจุบัน</div>
-                            <div class="text-2xl font-bold ${qtyClass}">${activeQty}</div>
+                ${badgeHTML} ${deleteBtnHTML}
+                <div class="absolute top-3 left-3 bg-white/90 backdrop-blur text-slate-700 text-xs font-semibold px-2 py-1 rounded shadow-sm z-10 border border-slate-100">${product.category_name || 'ทั่วไป'}</div>
+                <div class="h-48 bg-slate-100 overflow-hidden flex items-center justify-center p-4">
+                    ${product.image_url ? `<img src="${product.image_url}" alt="${product.product_name}" class="object-contain h-full w-full mix-blend-multiply">` : `<svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`}
+                </div>
+                <!-- เปลี่ยนเป็นใช้ Event listener ไม่ใช้ onclick inline -->
+                <div class="card-body-click p-5 flex-grow flex flex-col cursor-pointer hover:bg-slate-50 transition-colors" data-id="${product.id}">
+                    <h3 class="font-semibold text-slate-800 text-base leading-snug mb-1 line-clamp-2" title="${product.product_name}">${product.product_name}</h3>
+                    ${expiryDisplay}
+                    <div class="mt-auto pt-4 border-t border-slate-100 flex justify-between items-end">
+                        <div class="flex items-center">
+                            <div><p class="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">จำนวนคงเหลือ</p><p class="text-2xl font-bold ${isOutOfStock ? 'text-rose-500' : 'text-emerald-600'}">${displayQty}</p></div>
+                            ${expandBtnHTML}
                         </div>
-                        ${expiredQty > 0 ? `<div class="text-xs px-2 py-1 bg-rose-100 text-rose-700 rounded-full font-semibold">หมดอายุ: ${expiredQty}</div>` : ''}
+                        <div class="text-right">${isExpired ? `<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-400">หมดอายุ</span>` : `<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${!isOutOfStock ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">${!isOutOfStock ? 'มีสินค้า' : 'สินค้าหมด'}</span>`}</div>
                     </div>
-                </div>
-                <div class="px-4 py-3.5 flex-grow">
-                    <h3 class="font-bold text-slate-800 line-clamp-2 group-hover:text-emerald-700 transition-colors">${product.product_name}</h3>
-                    <p class="text-xs text-slate-500 mt-1">฿${product.price || '-'}</p>
-                    ${nearestExpiry ? `
-                        <div class="mt-2 pt-2 border-t border-slate-100 text-xs">
-                            <div class="text-slate-500">ใกล้หมดอายุ:</div>
-                            <div class="font-semibold ${expiryColor}">${formatDate(nearestExpiry)} (${nearestDays} วัน)</div>
-                        </div>` : ''}
-                </div>
-                <button class="view-details-btn mx-3 mb-3 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors w-full focus:outline-none" data-id="${product.id}">
-                    ดูรายละเอียด
-                </button>
-            `;
-
+                </div>`;
             gridView.appendChild(card);
+        });
 
-            // ผูก event ผ่าน JS (ไม่ใช้ onclick inline)
-            card.querySelector('.view-details-btn').addEventListener('click', () => {
-                showLotDetailsModal(product.id, inventoryData, showExpiredMode);
+        // ผูก Action ให้ปุ่ม
+        document.querySelectorAll('.btn-delete-single').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation(); // ไม่ให้คลิกทะลุไปเปิดรายละเอียด
+                const pId = e.currentTarget.dataset.id;
+                const pInfo = inventoryData.find(x => x.id == pId);
+                const batchesToDelete = pInfo.batches.filter(b => b.isExpired).map(b => ({ stock_id: b.stock_id, product_id: pId }));
+
+                showDeleteConfirmModal(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุรายการนี้ (${batchesToDelete.length} ล็อต)?`, async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                        });
+                        if (res.ok) { showToast('ลบรายการสำเร็จ', 'success'); reloadInventorySilently(); }
+                        else alert('เกิดข้อผิดพลาดในการลบ');
+                    } catch (err) { alert('เกิดข้อผิดพลาดในการเชื่อมต่อ'); }
+                });
+            });
+        });
+
+        // คลิกทั้งบล็อค หรือปุ่มลูกศร ให้เปิด Modal ดรายละเอียด
+        document.querySelectorAll('.card-body-click').forEach(el => {
+            el.addEventListener('click', (e) => {
+                showLotDetailsModal(e.currentTarget.dataset.id, inventoryData, showExpiredMode);
             });
         });
     }
 
-    // =============================================
-    // RENDER TABLE — UI แบบเก่า (รูป + ชื่อ + จำนวน + สถานะ + ดูล็อต)
-    // =============================================
-    function renderTable(pageData) {
+    // ===================================
+    // RENDER TABLE (UI สวยๆ ของเก่า)
+    // ===================================
+    function renderTable(data) {
         tableBody.innerHTML = '';
-        pageData.forEach(product => {
+        data.forEach(product => {
+            const nearestDay = (() => {
+                let min = null;
+                product.batches.forEach(b => {
+                    if (b.daysRemaining !== null) {
+                        if (showExpiredMode && !b.isExpired) return;
+                        if (!showExpiredMode && b.isExpired) return;
+                        if (min === null || b.daysRemaining < min) min = b.daysRemaining;
+                    }
+                });
+                return min;
+            })();
+
+            const isExpiredProduct = showExpiredMode;
+            const isDanger = !isExpiredProduct && nearestDay !== null && nearestDay === 0;
+            const isWarning = !isExpiredProduct && nearestDay !== null && nearestDay <= 2 && nearestDay >= 1;
+            const displayQty = showExpiredMode ? (product.expired_quantity || 0) : product.total_quantity;
+
             const tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100/60';
-
-            const activeQty = product.total_quantity;
-            const expiredQty = product.expired_quantity || 0;
-
-            let qtyClass = 'text-emerald-600 font-semibold';
-            if (activeQty === 0 && expiredQty === 0) qtyClass = 'text-slate-400';
-            else if (activeQty < 50 && activeQty > 0) qtyClass = 'text-amber-600 font-semibold';
-            else if (activeQty > 0 && expiredQty > 0) qtyClass = 'text-orange-600 font-semibold';
+            let rowBg = 'hover:bg-slate-50';
+            if (isExpiredProduct) rowBg = 'bg-slate-100/50 text-slate-500 hover:bg-slate-100';
+            else if (isDanger) rowBg = 'bg-rose-50 hover:bg-rose-100';
+            else if (isWarning) rowBg = 'bg-amber-50 hover:bg-amber-100';
+            tr.className = `transition-colors group border-b border-slate-100 ${rowBg}`;
 
             const imgHtml = product.image_url
-                ? `<img src="${product.image_url}" class="h-10 w-10 object-contain rounded bg-white border border-slate-200 p-0.5">`
-                : `<div class="h-10 w-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
-                       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                   </div>`;
+                ? `<img src="${product.image_url}" class="h-10 w-10 object-contain rounded bg-white border border-slate-200 p-0.5 ${isExpiredProduct ? 'grayscale' : ''}">`
+                : `<div class="h-10 w-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
 
-            let statusHtml = activeQty > 0
-                ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">มีสินค้า</span>`
-                : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800">หมด</span>`;
+            let actionBtnHtml = '';
+            // ✅ แก้ไข: เก็บแค่ ID สินค้า
+            if (isExpiredProduct && showExpiredMode && (typeof AUTH_USER === 'undefined' || AUTH_USER.role !== 'staff')) {
+                actionBtnHtml = `<button class="btn-delete-single-table text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 focus:outline-none p-1.5 rounded transition-colors mr-2" data-id="${product.id}" title="ลบสินค้าหมดอายุรายการนี้"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
+            }
 
-            let expiredWarning = expiredQty > 0
-                ? `<br><span class="text-xs text-rose-600 font-semibold">หมดอายุ: ${expiredQty}</span>` : '';
+            // ✅ แก้ไขปุ่ม Expand ไปใช้ Modal เลยแบบง่ายและสเถียรสุด ไม่ต้องทำซ้อนตาราง
+            const expandBtnHtml = product.batches.length > 0
+                ? `<button class="btn-expand text-slate-400 hover:text-emerald-600 focus:outline-none px-2 py-1 text-sm font-medium rounded hover:bg-emerald-50 transition-colors border border-transparent hover:border-emerald-200" data-id="${product.id}">ดูล็อตสินค้า</button>` : '';
 
             tr.innerHTML = `
                 <td class="px-6 py-4 w-16">${imgHtml}</td>
-                <td class="px-6 py-4">
-                    <div class="font-medium text-slate-800">${product.product_name}</div>
-                    <div class="text-xs text-slate-500 mt-0.5">${product.category_name || 'ทั่วไป'}</div>
-                </td>
-                <td class="px-6 py-4 text-right">
-                    <div class="font-mono text-lg ${qtyClass}">${activeQty}</div>${expiredWarning}
-                </td>
-                <td class="px-6 py-4 text-center">${statusHtml}</td>
-                <td class="px-6 py-4 text-right w-16">
-                    <button class="btn-view-lot text-emerald-600 hover:text-emerald-700 font-medium text-sm focus:outline-none p-1 rounded hover:bg-emerald-50 transition-colors" data-id="${product.id}">ดูล็อต</button>
-                </td>
-            `;
-
+                <td class="px-6 py-4"><div class="font-medium ${isExpiredProduct ? 'text-slate-500' : 'text-slate-800'}">${product.product_name}</div><div class="text-xs text-slate-500 mt-0.5"><span class="bg-slate-100 px-1.5 py-0.5 rounded mr-1">${product.category_name || 'ทั่วไป'}</span> ${product.batches.length} ล็อตการรับ</div></td>
+                <td class="px-6 py-4 text-right font-semibold ${isExpiredProduct ? 'text-slate-500' : (displayQty === 0 ? 'text-rose-500' : 'text-slate-800')}">${displayQty}</td>
+                <td class="px-6 py-4 text-center">${isExpiredProduct ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600">หมดอายุ</span>` : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${displayQty > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${displayQty > 0 ? 'มีสินค้า' : 'หมด'}</span>`}</td>
+                <td class="px-6 py-4 text-right flex items-center justify-end">${actionBtnHtml}${expandBtnHtml}</td>`;
             tableBody.appendChild(tr);
+        });
 
-            // ผูก event ผ่าน JS — แก้ปัญหา inventoryData ไม่อยู่ใน scope ของ onclick inline
-            tr.querySelector('.btn-view-lot').addEventListener('click', () => {
-                showLotDetailsModal(product.id, inventoryData, showExpiredMode);
+        // ผูก Event ให้ Modal ดูรายละเอียด
+        document.querySelectorAll('.btn-expand').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                showLotDetailsModal(e.currentTarget.dataset.id, inventoryData, showExpiredMode);
+            });
+        });
+
+        // ผูก Event ปุ่มลบ
+        document.querySelectorAll('.btn-delete-single-table').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const pId = e.currentTarget.dataset.id;
+                const pInfo = inventoryData.find(x => x.id == pId);
+                const batchesToDelete = pInfo.batches.filter(b => b.isExpired).map(b => ({ stock_id: b.stock_id, product_id: pId }));
+
+                showDeleteConfirmModal(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุรายการนี้ (${batchesToDelete.length} ล็อต)?`, async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/stock/delete-expired`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ category: currentCategory, expired_batches: batchesToDelete })
+                        });
+                        if (res.ok) { showToast('ลบรายการสำเร็จ', 'success'); reloadInventorySilently(); }
+                        else alert('เกิดข้อผิดพลาดในการลบ');
+                    } catch (err) { alert('เกิดข้อผิดพลาดในการเชื่อมต่อ'); }
+                });
             });
         });
     }
 
-    function renderPagination(total, pages) {
-        const pg = document.getElementById('paginationContainer');
-        if (!pg) return;
-        if (pages <= 1) { pg.innerHTML = ''; return; }
-        const fromItem = Math.min((currentPage - 1) * PAGE_SIZE + 1, total);
-        const toItem = Math.min(currentPage * PAGE_SIZE, total);
-        pg.innerHTML = `
+    // ===================================
+    // PAGINATION
+    // ===================================
+    function renderPagination(totalItems, totalPages) {
+        const container = document.getElementById('paginationContainer');
+        if (!container) return;
+        if (totalPages <= 1) { container.innerHTML = ''; return; }
+        const fromItem = Math.min((currentPage - 1) * PAGE_SIZE + 1, totalItems);
+        const toItem = Math.min(currentPage * PAGE_SIZE, totalItems);
+        container.innerHTML = `
             <div class="flex items-center justify-between flex-wrap gap-3">
-                <p class="text-sm text-slate-500">แสดง ${fromItem}–${toItem} จาก ${total} รายการ</p>
+                <p class="text-sm text-slate-500">แสดง ${fromItem}–${toItem} จาก ${totalItems} รายการ</p>
                 <div class="flex items-center gap-2">
-                    <button id="dbPrevBtn" class="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors" ${currentPage === 1 ? 'disabled' : ''}>← ก่อนหน้า</button>
-                    <span class="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg">หน้า ${currentPage} / ${pages}</span>
-                    <button id="dbNextBtn" class="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors" ${currentPage === pages ? 'disabled' : ''}>ถัดไป →</button>
+                    <button id="btnPrevPage" class="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors" ${currentPage === 1 ? 'disabled' : ''}>← ก่อนหน้า</button>
+                    <span class="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg">หน้า ${currentPage} / ${totalPages}</span>
+                    <button id="btnNextPage" class="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors" ${currentPage === totalPages ? 'disabled' : ''}>ถัดไป →</button>
                 </div>
-            </div>`;
-        document.getElementById('dbPrevBtn')?.addEventListener('click', () => { currentPage--; renderData(); window.scrollTo(0, 0); });
-        document.getElementById('dbNextBtn')?.addEventListener('click', () => { currentPage++; renderData(); window.scrollTo(0, 0); });
+            </div>
+        `;
+        document.getElementById('btnPrevPage')?.addEventListener('click', () => { currentPage--; renderData(); window.scrollTo(0, 0); });
+        document.getElementById('btnNextPage')?.addEventListener('click', () => { currentPage++; renderData(); window.scrollTo(0, 0); });
     }
 
+    // ===================================
+    // Toggles & Interactivity
+    // ===================================
     btnGridView.addEventListener('click', () => {
         currentView = 'grid';
         btnGridView.className = 'px-3 py-1.5 rounded-md text-sm font-medium bg-white shadow-sm text-emerald-700 border border-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500';
@@ -419,20 +482,16 @@ function initDashboard() {
     });
 
     const sortSelect = document.getElementById('sortSelect');
-    if (sortSelect) {
-        sortSelect.addEventListener('change', () => {
-            currentSort = sortSelect.value;
-            currentPage = 1;
-            renderData();
-        });
-    }
+    if (sortSelect) sortSelect.addEventListener('change', () => { currentSort = sortSelect.value; currentPage = 1; renderData(); });
 
     const searchBox = document.getElementById('productSearchBox');
-    if (searchBox) {
-        searchBox.addEventListener('input', debounce((e) => {
-            currentSearch = e.target.value.toLowerCase().trim();
-            currentPage = 1;
-            renderData();
-        }, 250));
-    }
+    if (searchBox) searchBox.addEventListener('input', debounce((e) => { currentSearch = e.target.value.toLowerCase().trim(); currentPage = 1; renderData(); }, 250));
 }
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    // โหลด Dashboard ทำงานเมื่อพบบนหน้าจอ
+    if (window.location.pathname === '/' || document.getElementById('gridView')) {
+        initDashboard();
+    }
+});
