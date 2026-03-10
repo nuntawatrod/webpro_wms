@@ -1,11 +1,11 @@
 // public/js/product.js - Product Management CRUD (Updated with SweetAlert UI)
 
-function initProductManagement() {
+function initProductManagement() { // หน้าเพิ่ม/แก้ไข/ลบสินค้า
     const viewAdd = document.getElementById('viewAdd');
     const viewEdit = document.getElementById('viewEdit');
     const viewDelete = document.getElementById('viewDelete');
 
-    const activeTab = (window.ACTIVE_TAB || '').replace('manage_products_', '');
+    const activeTab = (window.ACTIVE_TAB || '').replace('manage_products_', ''); // 'add', 'edit', หรือ 'delete'
 
     let masterEditProducts = [];
     let masterDeleteProducts = [];
@@ -15,7 +15,7 @@ function initProductManagement() {
     const searchResults = document.getElementById('deleteSearchResults');
     const productCard = document.getElementById('selectedProductCard');
 
-    function initView() {
+    function initView() { // แสดงตามแท็บที่เลือก
         if (!viewAdd || !viewEdit || !viewDelete) return;
         viewAdd.classList.add('hidden');
         viewEdit.classList.add('hidden');
@@ -33,14 +33,14 @@ function initProductManagement() {
     }
 
     // CREATE
-    document.getElementById('createProductForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
+    document.getElementById('createProductForm').addEventListener('submit', async (e) => { // ดึงข้อมูลจากฟอร์มเมิ้อกดปุ่มสร้างสินค้าใหม่
+        e.preventDefault();// ดึงข้อมูลจากฟอร์ม
         const product_name = document.getElementById('newProductName').value.trim();
         const category_name = document.getElementById('newProductCategory').value;
         const price = parseFloat(document.getElementById('newProductPrice').value);
         const shelf_life_days = parseInt(document.getElementById('newProductShelfLife').value, 10);
         const image_url = document.getElementById('newProductImageUrl').value.trim();
-        try {
+        try { // เรียก API เพื่อสร้างสินค้าใหม่
             const res = await fetch('/api/admin/products', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -64,8 +64,8 @@ function initProductManagement() {
         }
     });
 
-    // EDIT - fetch & render (โค้ดเดิมของคุณ)
-    async function fetchProductsForEdit() {
+    // EDIT - fetch & render 
+    async function fetchProductsForEdit() { // ดึงข้อมูลสินค้าทั้งหมดสำหรับการแก้ไข
         if (masterEditProducts.length > 0) return;
         try {
             const res = await fetch('/api/admin/products');
@@ -74,18 +74,18 @@ function initProductManagement() {
         } catch (e) { console.error(e); }
     }
 
-    function renderEditSearchOptions(products) {
+    function renderEditSearchOptions(products) { // แสดงผลลัพธ์การค้นหาสำหรับแก้ไขสินค้า
         const el = document.getElementById('editSearchResults');
         el.innerHTML = '';
         if (products.length === 0) {
             el.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">ไม่พบสินค้า</div>';
             return;
         }
-        products.forEach(p => {
+        products.forEach(p => { 
             const div = document.createElement('div');
             div.className = 'px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-50 last:border-0 flex items-center justify-between';
             div.innerHTML = `<span class="text-sm font-medium text-slate-700">${p.product_name}</span><span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">${p.category_name}</span>`;
-            div.addEventListener('click', () => {
+            div.addEventListener('click', () => { // เมื่อคลิกที่สินค้าในผลลัพธ์การค้นหา จะแสดงฟอร์มแก้ไขพร้อมข้อมูลของสินค้านั้น
                 document.getElementById('editSearchInput').value = p.product_name;
                 document.getElementById('editSearchResults').classList.add('hidden');
                 document.getElementById('editProductId').value = p.id;
@@ -121,7 +121,7 @@ function initProductManagement() {
     }
 
     // DELETE - fetch & render
-    async function fetchProductsForDelete() {
+    async function fetchProductsForDelete() { // ดึงข้อมูลสินค้าทั้งหมดสำหรับการลบ
         if (masterDeleteProducts.length > 0) return;
         try {
             const res = await fetch('/api/admin/products');
@@ -130,13 +130,13 @@ function initProductManagement() {
         } catch (e) { console.error(e); }
     }
 
-    function renderDeleteSearchOptions(products) {
+    function renderDeleteSearchOptions(products) { // แสดงผลลัพธ์การค้นหาสำหรับลบสินค้า
         searchResults.innerHTML = '';
         if (products.length === 0) {
             searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">ไม่พบสินค้า</div>';
             return;
         }
-        products.forEach(p => {
+        products.forEach(p => { // แสดงผลลัพธ์การค้นหาสำหรับลบสินค้า
             const div = document.createElement('div');
             div.className = 'px-4 py-3 hover:bg-rose-50 cursor-pointer transition-colors border-b border-slate-50 last:border-0 flex items-center justify-between';
             div.innerHTML = `<span class="text-sm font-medium text-slate-700">${p.product_name}</span><span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">${p.category_name}</span>`;
@@ -155,11 +155,11 @@ function initProductManagement() {
         });
     }
 
-    // แก้ไขส่วนปุ่มลบ: ใช้ UI SweetAlert2 จากไฟล์เก่าของคุณ
-    document.getElementById('btnConfirmDelete').addEventListener('click', () => {
+    
+    document.getElementById('btnConfirmDelete').addEventListener('click', () => { // เมื่อกดปุ่มยืนยันการลบสินค้า
         if (!currentSelectedProduct) return;
 
-        Swal.fire({
+        Swal.fire({ // ใช้ SweetAlert แทน confirm() เพื่อยืนยันการลบสินค้า
             title: 'ยืนยันการลบ?',
             text: `คุณต้องการลบ "${currentSelectedProduct.product_name}" และสต็อกที่เกี่ยวข้องใช่หรือไม่?`,
             icon: 'warning',
@@ -209,7 +209,7 @@ function initProductManagement() {
     });
 
     // EDIT - submit event
-    document.getElementById('editProductForm')?.addEventListener('submit', async (e) => {
+    document.getElementById('editProductForm')?.addEventListener('submit', async (e) => { // เมื่อกดปุ่มบันทึกการแก้ไขสินค้า
         e.preventDefault();
         const form = e.target;
         const submitBtn = form.querySelector('button[type="submit"]');
