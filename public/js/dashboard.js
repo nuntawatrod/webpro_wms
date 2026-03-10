@@ -25,10 +25,10 @@ function initDashboard() {
             currentPage = 1;
             if (showExpiredMode) {
                 btnToggleExpired.className = 'bg-slate-800 hover:bg-slate-900 text-white w-44 justify-center py-2.5 rounded-xl text-sm font-bold shadow-md shadow-slate-800/20 transition-all flex items-center shrink-0 ml-1 sm:ml-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500';
-                btnToggleExpired.innerHTML = `<svg class="w-5 h-5 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>กลับสินค้าปกติ`;
+                btnToggleExpired.innerHTML = `<svg width="20" height="20" class="w-5 h-5 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>กลับสินค้าปกติ`;
             } else {
                 btnToggleExpired.className = 'bg-rose-600 hover:bg-rose-700 text-white w-44 justify-center py-2.5 rounded-xl text-sm font-bold shadow-md shadow-rose-600/20 transition-all flex items-center shrink-0 ml-1 sm:ml-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500';
-                btnToggleExpired.innerHTML = `<svg class="w-5 h-5 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>ดูสินค้าหมดอายุ`;
+                btnToggleExpired.innerHTML = `<svg width="20" height="20" class="w-5 h-5 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>ดูสินค้าหมดอายุ`;
             }
             renderData();
         });
@@ -214,20 +214,20 @@ function initDashboard() {
         const btnDeleteText = document.getElementById('btnDeleteExpiredText');
 
         if (deleteContainer && btnDelete && btnDeleteText && (typeof AUTH_USER === 'undefined' || AUTH_USER.role !== 'staff')) {
-            let expiredBatchesCount = 0;
+            let expiredProductsCount = 0;
             if (showExpiredMode) {
-                sortedData.forEach(p => { p.batches.forEach(b => { if (b.isExpired) expiredBatchesCount++; }); });
+                expiredProductsCount = sortedData.filter(p => p.batches.some(b => b.isExpired)).length;
             }
 
-            if (showExpiredMode && expiredBatchesCount > 0) {
+            if (showExpiredMode && expiredProductsCount > 0) {
                 deleteContainer.classList.remove('hidden');
-                btnDeleteText.textContent = `ลบสินค้าหมดอายุ${currentCategory !== 'all' ? 'ในหมวดนี้' : 'ทั้งหมด'} (${expiredBatchesCount})`;
+                btnDeleteText.textContent = `ลบสินค้าหมดอายุ${currentCategory !== 'all' ? 'ในหมวดนี้' : 'ทั้งหมด'} (${expiredProductsCount} รายการ)`;
 
                 const newBtnDelete = btnDelete.cloneNode(true);
                 btnDelete.parentNode.replaceChild(newBtnDelete, btnDelete);
 
                 newBtnDelete.addEventListener('click', () => {
-                    showDeleteConfirmModal(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredBatchesCount} ล็อต?\nการกระทำนี้ไม่สามารถกู้คืนได้`, async () => {
+                    showDeleteConfirmModal(`คุณแน่ใจหรือไม่ที่จะลบสินค้าที่หมดอายุทั้งหมดจำนวน ${expiredProductsCount} รายการ?\nการกระทำนี้ไม่สามารถกู้คืนได้`, async () => {
                         const batchesToDelete = [];
                         sortedData.forEach(p => {
                             p.batches.forEach(b => {
@@ -284,9 +284,9 @@ function initDashboard() {
             card.className = `product-card bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col relative ${cardBorderClass}`;
 
             let badgeHTML = '';
-            if (isExpired) badgeHTML = `<div class="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>หมดอายุ</div>`;
-            else if (isDanger) badgeHTML = `<div class="absolute top-3 right-3 bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>วันนี้</div>`;
-            else if (isWarning) badgeHTML = `<div class="absolute top-3 right-3 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>ใกล้หมดอายุ (${nearestExpiryDay} วัน)</div>`;
+            if (isExpired) badgeHTML = `<div class="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg width="12" height="12" class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>หมดอายุ</div>`;
+            else if (isDanger) badgeHTML = `<div class="absolute top-3 right-3 bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg width="12" height="12" class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>วันนี้</div>`;
+            else if (isWarning) badgeHTML = `<div class="absolute top-3 right-3 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center"><svg width="12" height="12" class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>ใกล้หมดอายุ (${nearestExpiryDay} วัน)</div>`;
 
             let expiryDisplay = '';
             if (nearestExpiryDay !== null) {
@@ -298,11 +298,11 @@ function initDashboard() {
             // ✅ แก้ไข: เก็บแค่ ID สินค้าแทนการส่งตระกร้า JSON ขนาดใหญ่
             let deleteBtnHTML = '';
             if (isExpired && showExpiredMode && (typeof AUTH_USER === 'undefined' || AUTH_USER.role !== 'staff')) {
-                deleteBtnHTML = `<button class="btn-delete-single absolute top-12 right-3 bg-rose-50 hover:bg-rose-100 text-rose-600 p-1.5 rounded-full shadow-sm z-10 transition-colors" data-id="${product.id}" title="ลบสินค้าหมดอายุรายการนี้"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
+                deleteBtnHTML = `<button class="btn-delete-single absolute top-12 right-3 bg-rose-50 hover:bg-rose-100 text-rose-600 p-1.5 rounded-full shadow-sm z-10 transition-colors" data-id="${product.id}" title="ลบสินค้าหมดอายุรายการนี้"><svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
             }
 
             let expandBtnHTML = '';
-            if (product.batches.length > 0) expandBtnHTML = `<button class="btn-expand-grid text-slate-400 hover:text-emerald-600 focus:outline-none p-1.5 rounded-full hover:bg-emerald-50 transition-colors ml-2" data-id="${product.id}"><svg class="w-5 h-5 transition-transform duration-200 target-icon-${product.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>`;
+            if (product.batches.length > 0) expandBtnHTML = `<button class="btn-expand-grid text-slate-400 hover:text-emerald-600 focus:outline-none p-1.5 rounded-full hover:bg-emerald-50 transition-colors ml-2" data-id="${product.id}"><svg width="20" height="20" class="w-5 h-5 transition-transform duration-200 target-icon-${product.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>`;
 
             const displayQty = showExpiredMode ? (product.expired_quantity || 0) : product.total_quantity;
             const isOutOfStock = displayQty === 0;
@@ -394,7 +394,7 @@ function initDashboard() {
             let actionBtnHtml = '';
             // ✅ แก้ไข: เก็บแค่ ID สินค้า
             if (isExpiredProduct && showExpiredMode && (typeof AUTH_USER === 'undefined' || AUTH_USER.role !== 'staff')) {
-                actionBtnHtml = `<button class="btn-delete-single-table text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 focus:outline-none p-1.5 rounded transition-colors mr-2" data-id="${product.id}" title="ลบสินค้าหมดอายุรายการนี้"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
+                actionBtnHtml = `<button class="btn-delete-single-table text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 focus:outline-none p-1.5 rounded transition-colors mr-2" data-id="${product.id}" title="ลบสินค้าหมดอายุรายการนี้"><svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
             }
 
             // ✅ แก้ไขปุ่ม Expand ไปใช้ Modal เลยแบบง่ายและสเถียรสุด ไม่ต้องทำซ้อนตาราง

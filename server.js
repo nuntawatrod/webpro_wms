@@ -156,60 +156,6 @@ function initializeDatabase() {
             }
         });
 
-        // Migration: add shelf_life_days and created_by if it doesn't exist in the Products table
-        db.all("PRAGMA table_info(Products)", (err, cols) => {
-            if (!err && cols && !cols.find(c => c.name === 'shelf_life_days')) {
-                db.run("ALTER TABLE Products ADD COLUMN shelf_life_days INTEGER DEFAULT 7", (alterErr) => {
-                    if (alterErr) console.error("Migration failed:", alterErr);
-                    else console.log("Migration: Added shelf_life_days column to Products.");
-                });
-            }
-            if (!err && cols && !cols.find(c => c.name === 'created_by')) {
-                db.run("ALTER TABLE Products ADD COLUMN created_by INTEGER REFERENCES Users(id) ON DELETE SET NULL", (alterErr) => {
-                    if (alterErr) console.error("Migration created_by failed:", alterErr);
-                    else console.log("Migration: Added created_by column to Products.");
-                });
-            }
-        });
-
-        // Migration: add extra_info column to Transactions_Log if missing
-        db.all("PRAGMA table_info(Transactions_Log)", (err, cols) => {
-            if (!err && cols && !cols.find(c => c.name === 'extra_info')) {
-                db.run("ALTER TABLE Transactions_Log ADD COLUMN extra_info TEXT", (alterErr) => {
-                    if (alterErr) console.error("Migration extra_info failed:", alterErr);
-                    else console.log("Migration: Added extra_info column to Transactions_Log.");
-                });
-            }
-            // Removed deleted_product_name migration as we are using extra_info instead
-        });
-
-        // Migration: add full_name and created_at to Users if missing
-        db.all("PRAGMA table_info(Users)", (err, cols) => {
-            if (!err && cols && !cols.find(c => c.name === 'full_name')) {
-                db.run("ALTER TABLE Users ADD COLUMN full_name TEXT", (alterErr) => {
-                    if (alterErr) console.error("Migration full_name failed:", alterErr);
-                    else console.log("Migration: Added full_name column to Users.");
-                });
-            }
-            if (!err && cols && !cols.find(c => c.name === 'created_at')) {
-                db.run("ALTER TABLE Users ADD COLUMN created_at DATETIME", (alterErr) => {
-                    if (alterErr) console.error("Migration created_at failed:", alterErr);
-                    else {
-                        console.log("Migration: Added created_at column to Users.");
-                        db.run("UPDATE Users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL");
-                    }
-                });
-            }
-        });
-
-        // Migration: Update roles from admin/user to manager/staff
-        db.run("UPDATE Users SET role = 'manager' WHERE role = 'admin'", (err) => {
-            if (!err) console.log("Migration: Updated old admin roles to manager.");
-        });
-        db.run("UPDATE Users SET role = 'staff' WHERE role = 'user'", (err) => {
-            if (!err) console.log("Migration: Updated old user roles to staff.");
-        });
-
         // Seed Products if empty
         db.get("SELECT COUNT(*) AS count FROM Products", (err, row) => {
             if (err) {
@@ -218,7 +164,6 @@ function initializeDatabase() {
             }
             if (row.count === 0) {
                 console.log("Database is empty. Seeding from CSV...");
-                seedFromCSV();
             } else {
                 console.log("Database already seeded.");
             }
@@ -229,103 +174,6 @@ function initializeDatabase() {
 // Returns current Bangkok time as 'YYYY-MM-DD HH:MM:SS' string
 function getBangkokTimestamp() {
     return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' }).replace('T', ' ');
-}
-
-function calculateDaysBetween(startDate, endDate) {
-    if (!startDate || !endDate) return null;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (isNaN(start) || isNaN(end)) return null;
-    return Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-}
-
-function seedFromCSV() {
-    if (!fs.existsSync(CSV_PATH)) {
-        console.warn(`CSV file not found at ${CSV_PATH}. Skipping seed.`);
-        return;
-    }
-
-    const productsMap = new Map();
-    const stockEntries = [];
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    fs.createReadStream(CSV_PATH)
-        .pipe(csv({
-            mapHeaders: ({ header }) => header.trim().replace(/^[\uFEFF\u200B]+/, '')
-        }))
-        .on('data', (row) => {
-            const { product_name, price, image_url, category_name, shelf_life_days, status } = row;
-            if (!product_name) return;
-
-            const shelfLife = parseInt(shelf_life_days) || 7;
-
-            if (!productsMap.has(product_name)) {
-                productsMap.set(product_name, {
-                    price: parseFloat(price) || 0,
-                    image_url: image_url || '',
-                    category_name: category_name || 'ทั่วไป',
-                    status: status || 'normal',
-                    shelf_life_days: shelfLife
-                });
-            }
-
-            // USER REQUIREMENT: Randomly initialize the amount of products in stock in the beginning
-            // Generate a random qty between 10 and 100
-            const randomQty = Math.floor(Math.random() * (100 - 10 + 1)) + 10;
-
-            // Randomly offset receiving date by -3 to 0 days to simulate existing stock
-            const rOffset = Math.floor(Math.random() * 4);
-            const d = new Date();
-            d.setDate(d.getDate() - rOffset);
-            const simulatedReceiveDate = d.toISOString().split('T')[0];
-
-            // Expiry = simulated Receive + shelfLife
-            const ed = new Date(d);
-            ed.setDate(ed.getDate() + shelfLife);
-            const simulatedExpiryDate = ed.toISOString().split('T')[0];
-
-            stockEntries.push({
-                product_name,
-                receive_date: simulatedReceiveDate,
-                expiry_date: simulatedExpiryDate,
-                quantity: randomQty
-            });
-        })
-        .on('end', () => {
-            db.serialize(() => {
-                db.run('BEGIN TRANSACTION');
-
-                const stmtProduct = db.prepare(`INSERT OR IGNORE INTO Products (product_name, price, image_url, category_name, status, shelf_life_days) VALUES (?, ?, ?, ?, ?, ?)`);
-
-                for (const [name, data] of productsMap.entries()) {
-                    stmtProduct.run([name, data.price, data.image_url, data.category_name, data.status, data.shelf_life_days]);
-                }
-                stmtProduct.finalize();
-
-                const stmtStock = db.prepare(`
-                    INSERT INTO Stock (product_id, receive_date, expiry_date, quantity) 
-                    VALUES ((SELECT id FROM Products WHERE product_name = ?), ?, ?, ?)
-                `);
-
-                for (const stock of stockEntries) {
-                    stmtStock.run([stock.product_name, stock.receive_date, stock.expiry_date, stock.quantity]);
-                }
-                stmtStock.finalize();
-
-                // Add initial log entries
-                const seedTs = getBangkokTimestamp();
-                const stmtLog = db.prepare(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date) VALUES ('ADD', (SELECT id FROM Products WHERE product_name = ?), ?, 'System/Setup', ?)`);
-                for (const stock of stockEntries) {
-                    stmtLog.run([stock.product_name, stock.quantity, seedTs]);
-                }
-                stmtLog.finalize();
-
-                db.run('COMMIT', (err) => {
-                    if (err) console.error("Error seeding database:", err);
-                    else console.log("Database seeding completed with randomized stock amounts.");
-                });
-            });
-        });
 }
 
 // ==========================================
