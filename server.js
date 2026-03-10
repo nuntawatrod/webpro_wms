@@ -1,8 +1,6 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
-const fs = require('fs');
-const csv = require('csv-parser');
 const bodyParser = require('body-parser');
 const path = require('path');
 const session = require('express-session');
@@ -100,7 +98,7 @@ function initializeDatabase() {
             product_name TEXT UNIQUE NOT NULL,
             price REAL,
             image_url TEXT,
-            category_name TEXT CHECK(category_name IN ('เนื้อสัตว์', 'ผักผลไม้', 'อาหารทะเล', 'ของแห้ง', 'ทั่วไป')),
+            category_name TEXT CHECK(category_name IN ('เนื้อสัตว์', 'ผัก', 'ผลไม้', 'นม/เนย/ไข่', 'เครื่องปรุง', 'เครื่องดื่ม', 'ทั่วไป', 'อื่นๆ')),
             status TEXT DEFAULT 'active',
             shelf_life_days INTEGER DEFAULT 7,
             created_by INTEGER,
@@ -123,7 +121,8 @@ function initializeDatabase() {
         // Transactions_Log Table
         db.run(`CREATE TABLE IF NOT EXISTS Transactions_Log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            action_type VARCHAR(10) CHECK(action_type IN ('ADD', 'WITHDRAW', 'EXPIRED', 'EDIT', 'CREATE_USER', 'DELETE_USER', 'UPDATE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_PRODUCT')),
+            action_type VARCHAR(10) CHECK(action_type IN ('ADD', 'WITHDRAW', 'EXPIRED', 'EDIT', 'CREATE_USER',
+            'DELETE_USER', 'UPDATE_USER', 'CREATE_PRODUCT', 'DELETE_PRODUCT', 'UPDATE_PRODUCT')),
             product_id INTEGER,
             quantity INTEGER,
             action_date DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -145,29 +144,23 @@ function initializeDatabase() {
 
         // Seed Admin User
         db.get("SELECT COUNT(*) AS count FROM Users WHERE username = 'admin'", (err, row) => {
-            if (!err && row.count === 0) {
+            if (err) {
+                console.error("Error checking for existence of admin user:", err.message);
+                return;
+            }
+            if (row.count === 0) {
                 const salt = bcrypt.genSaltSync(10);
                 const hash = bcrypt.hashSync('1234', salt);
-                db.run(`INSERT INTO Users (username, password, role, full_name) VALUES ('admin', ?, 'admin', 'System Administrator')`, [hash]);
-                console.log("Seeded default Admin user (admin / 1234)");
+                db.run(`INSERT INTO Users (username, password, role, full_name) VALUES ('admin', ?, 'admin', 'System Administrator')`, [hash], (err) => {
+                    if (err) console.error("Error seeding default Admin:", err.message);
+                    else console.log("Seeded default Admin user (admin / 1234)");
+                });
             } else {
                 // If admin exists, ensure it has 'admin' role
                 db.run("UPDATE Users SET role = 'admin' WHERE username = 'admin' AND role != 'admin'");
             }
         });
 
-        // Seed Products if empty
-        db.get("SELECT COUNT(*) AS count FROM Products", (err, row) => {
-            if (err) {
-                console.error("Error checking Products table:", err);
-                return;
-            }
-            if (row.count === 0) {
-                console.log("Database is empty. Seeding from CSV...");
-            } else {
-                console.log("Database already seeded.");
-            }
-        });
     });
 }
 
@@ -259,8 +252,8 @@ app.get('/admin/users', requireAdmin, (req, res) => {
 // ==========================================
 
 app.get('/api/inventory', requireAuth, (req, res) => {
-    // Run auto-expire check in the background when inventory is requested
-    autoLogExpiredProducts();
+    // Run auto-expire check periodically in the background
+    // (moved to server start to avoid slowing down inventory requests)
 
     const query = `
         SELECT 
@@ -703,51 +696,6 @@ app.get('/api/admin/system-logs', requireManager, (req, res) => {
     });
 });
 
-// Admin: Reseed all stock with random quantities
-app.post('/api/admin/reseed-stock', requireManager, (req, res) => {
-    db.serialize(() => {
-        db.run('BEGIN TRANSACTION');
-        db.run('DELETE FROM Stock', (err) => {
-            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ล้มเหลวในการลบสต็อก' }); }
-
-            db.run('DELETE FROM Transactions_Log', (err2) => {
-                if (err2) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ล้มเหลวในการลบประวัติ' }); }
-
-                db.all('SELECT id, shelf_life_days FROM Products', [], (err3, products) => {
-                    if (err3 || !products.length) { db.run('ROLLBACK'); return res.status(500).json({ error: 'ไม่พบข้อมูลสินค้า' }); }
-
-                    const stmtStock = db.prepare(`INSERT INTO Stock (product_id, receive_date, expiry_date, quantity) VALUES (?, ?, ?, ?)`);
-                    const reseedTs = getBangkokTimestamp();
-                    const stmtLog = db.prepare(`INSERT INTO Transactions_Log (action_type, product_id, quantity, actor_name, action_date) VALUES ('ADD', ?, ?, 'System/Reseed', ?)`);
-                    const today = new Date();
-
-                    products.forEach(p => {
-                        const qty = Math.floor(Math.random() * 141) + 10; // 10-150
-                        const offset = Math.floor(Math.random() * 5); // 0-4 days ago
-                        const receiveDate = new Date(today);
-                        receiveDate.setDate(receiveDate.getDate() - offset);
-                        const expiryDate = new Date(receiveDate);
-                        expiryDate.setDate(expiryDate.getDate() + (p.shelf_life_days || 7));
-
-                        const rd = receiveDate.toISOString().split('T')[0];
-                        const ed = expiryDate.toISOString().split('T')[0];
-                        stmtStock.run([p.id, rd, ed, qty]);
-                        stmtLog.run([p.id, qty, reseedTs]);
-                    });
-
-                    stmtStock.finalize();
-                    stmtLog.finalize();
-
-                    db.run('COMMIT', (commitErr) => {
-                        if (commitErr) return res.status(500).json({ error: 'COMMIT ล้มเหลว' });
-                        res.json({ message: `สุ่มสต็อกสินค้า ${products.length} รายการสำเร็จ` });
-                    });
-                });
-            });
-        });
-    });
-});
-
 app.get('/api/admin/users', requireAdmin, (req, res) => {
     db.all("SELECT id, username, full_name, role, created_at FROM Users", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -946,6 +894,11 @@ app.delete('/api/admin/products/:id', requireManager, (req, res) => {
 // Start listening
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
+
+    // Initialize background tasks
+    autoLogExpiredProducts();
+    // Run every hour
+    setInterval(autoLogExpiredProducts, 1000 * 60 * 60);
 
     // Auto-open browser
     const url = `http://localhost:${PORT}`;
