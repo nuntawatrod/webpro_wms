@@ -143,7 +143,7 @@ function initAdminDashboard() {
     }
 
     // expose toggleFreqTab globally (ถูกเรียกจาก onclick ใน EJS)
-    window.toggleFreqTab = function(tab) {
+    window.toggleFreqTab = function (tab) {
         currentFreqTab = tab;
         const btnR = document.getElementById('btnFreqReceive');
         const btnW = document.getElementById('btnFreqWithdraw');
